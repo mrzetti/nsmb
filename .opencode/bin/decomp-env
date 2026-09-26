@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# decomp-env - resolve the NSMB decompilation CPU/resource policy.
+#
+# This is the single source of truth for build resource limits. Every build
+# path (direct `zig build`, the `single` step, and the objdiff MCP `build`
+# tool) resolves its limits through this script, so MCP-triggered builds can
+# never bypass the policy.
+#
+# The server this repository is worked on hosts other services. Decompilation
+# builds must therefore never default to using every logical CPU.
+#
+# Overridable by environment:
+#   DECOMP_BUILD_JOBS   - zig concurrency (-j).           default: auto
+#   DECOMP_CPU_CORES    - CPUs to make available.        default: auto (nproc)
+#   DECOMP_CPU_QUOTA    - cgroup v2 CPU quota.           default: auto
+#   DECOMP_NICE         - nice level for build children. default: 10
+#   DECOMP_ENFORCE      - cgroup | taskset | off          default: auto
+#   DECOMP_CGROUP_ROOT  - cgroup v2 mount point.         default: auto
+#
+# This script only prints assignments; it does not enforce them. Use
+# .opencode/bin/limited-build to run a command under the resolved policy, or
+# .opencode/bin/objdiff-mcp to run the whole objdiff MCP server under it.
+
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Locate the NSMB repository root (this script lives in <root>/.opencode/bin).
+# ---------------------------------------------------------------------------
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+NSMB_ROOT="${NSMB_ROOT:-$(cd -- "$here/../.." && pwd)}"
+export NSMB_ROOT
+
+# ---------------------------------------------------------------------------
+# Detect the active release. build.zig resolves -DRelease, else $NSMB_RELEASE,
+# else A2DE. Keep this in sync with build.zig's default.
+# ---------------------------------------------------------------------------
+NSMB_RELEASE="${NSMB_RELEASE:-A2DE}"
+export NSMB_RELEASE
+
+# ---------------------------------------------------------------------------
+# Tool paths. Everything is vendored under <root>/.tools so the experimental
+# objdiff-mcp build never overwrites the stable objdiff CLI.
+# ---------------------------------------------------------------------------
+TOOLS_DIR="$NSMB_ROOT/.tools"
+export TOOLS_DIR
+export ZIG_BIN="${ZIG_BIN:-$TOOLS_DIR/zig-0.16.0/zig}"
+export DSD_BIN="${DSD_BIN:-$TOOLS_DIR/dsd}"
+export OBJDIFF_STABLE="${OBJDIFF_STABLE:-$TOOLS_DIR/objdiff-stable/objdiff-cli}"
+export OBJDIFF_MCP="${OBJDIFF_MCP:-$TOOLS_DIR/objdiff-mcp/objdiff-cli}"
+export GHJAR="${GHJAR:-$TOOLS_DIR/ghidra}"
+
+# Put the vendored toolchain first on PATH. build.zig shells out to bare "dsd"
+# and bare "objdiff-cli" via std.Build.addSystemCommand, which resolves through
+# PATH, so the agent never has to know where the binaries live.
+export PATH="$TOOLS_DIR/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+# The objdiff MCP wrapper. The opencode.jsonc MCP entry invokes this instead of
+# the raw binary so the entire server - and therefore every build() descendant
+# (zig -> wine -> mwccarm) - inherits one cgroup CPU cap.
+# ---------------------------------------------------------------------------
+export OBJDIFF_MCP_WRAPPER="$here/objdiff-mcp"
+export LIMITED_BUILD="$here/limited-build"
+
+# ---------------------------------------------------------------------------
+# CPU policy resolution.
+#
+#   DECOMP_CPU_CORES (nproc)   DECOMP_BUILD_JOBS   DECOMP_CPU_QUOTA
+#   -----------------------    -----------------   -----------------
+#          1                          1                    100%
+#          2                          1                    100%
+#        >= 3                          2                    200%
+#
+# Rationale: 1-2 vCPU hosts may be running other services, so a single job and a
+# one-core quota leave real headroom. A host with 3+ vCPUs can afford two
+# compile jobs behind a two-core aggregate quota. We never default to all
+# logical CPUs: "more CPU is faster" is not a valid reason to drop the cap.
+# ---------------------------------------------------------------------------
+_detect_cores() {
+  if command -v nproc >/dev/null 2>&1; then
+    nproc
+  else
+    getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1
+  fi
+}
+
+cpu_cores="${DECOMP_CPU_CORES:-$(_detect_cores)}"
+if ! [[ "$cpu_cores" =~ ^[0-9]+$ ]] || [ "$cpu_cores" -lt 1 ]; then
+  cpu_cores=1
+fi
+
+if [ -n "${DECOMP_BUILD_JOBS:-}" ]; then
+  build_jobs="$DECOMP_BUILD_JOBS"
+else
+  if [ "$cpu_cores" -le 2 ]; then
+    build_jobs=1
+  else
+    build_jobs=2
+  fi
+fi
+
+if [ -n "${DECOMP_CPU_QUOTA:-}" ]; then
+  cpu_quota="$DECOMP_CPU_QUOTA"
+else
+  if [ "$cpu_cores" -le 2 ]; then
+    cpu_quota="100%"
+  else
+    cpu_quota="200%"
+  fi
+fi
+
+nice_level="${DECOMP_NICE:-10}"
+if ! [[ "$nice_level" =~ ^-?[0-9]+$ ]]; then
+  nice_level=10
+fi
+
+# CPU affinity set. taskset fallback only; affinity is not a quota.
+if [ -n "${DECOMP_CPUSET:-}" ]; then
+  cpuset="$DECOMP_CPUSET"
+else
+  cpuset="0-$((cpu_cores - 1))"
+  [ "$cpu_cores" -eq 1 ] && cpuset="0"
+fi
+
+# ---------------------------------------------------------------------------
+# cgroup v2 discovery.
+#
+# systemd --user scopes are the tidy way to do this, but they need a user bus.
+# On a container/headless box there is no bus, so we drive cgroup v2 directly.
+#
+# Two traps make a naive "cpu.max is writable" probe report a false positive:
+#
+#  1. Threaded domains. If a candidate cgroup is in threaded mode
+#     (`cgroup.type` == "domain threaded"), cgroup.procs is NOT writable
+#     ("Operation not supported") and per-thread CPU bandwidth control does not
+#     apply, even though `cpu.max` accepts a value and `cgroup.controllers` lists
+#     `cpu`. The limit silently does nothing. This host's session scope
+#     (/user.slice/user-1002.slice/session-*.scope) is exactly this case.
+#  2. An "invalid" domain, which happens when a parent's type and its
+#     populated children disagree.
+#
+# So the probe below only accepts a candidate when all three hold:
+#   - cgroup.type is exactly "domain" (not "domain threaded", not "invalid")
+#   - cpu.max accepts a write
+#   - the probe process can actually write its own PID to cgroup.procs
+# ---------------------------------------------------------------------------
+cgroup_root="${DECOMP_CGROUP_ROOT:-}"
+if [ -z "$cgroup_root" ]; then
+  [ -r /sys/fs/cgroup/cgroup.controllers ] && cgroup_root=/sys/fs/cgroup
+fi
+
+# A candidate base is a directory that can parent a new domain cgroup.
+_cgroup_base_ok() {
+  local base="$1" probe type
+  [ -d "$base" ] || return 1
+
+  probe="$base/.decomp-probe-$$"
+  mkdir -p "$probe" 2>/dev/null || return 1
+
+  type="$(cat "$probe/cgroup.type" 2>/dev/null || echo unknown)"
+  # Must be a plain domain: threaded domains cannot enforce cpu.max per process.
+  [ "$type" = "domain" ] || { rmdir "$probe" 2>/dev/null; return 1; }
+
+  # The cpu controller must be delegated to the child.
+  grep -qw cpu "$probe/cgroup.controllers" 2>/dev/null || { rmdir "$probe" 2>/dev/null; return 1; }
+
+  echo "max 100000" >"$probe/cpu.max" 2>/dev/null || { rmdir "$probe" 2>/dev/null; return 1; }
+
+  # The decisive check: can this process actually join? Writes to cgroup.procs
+  # fail with EOPNOTSUPP in threaded domains even though the files look usable.
+  if ! (echo $$ >"$probe/cgroup.procs") 2>/dev/null; then
+    rmdir "$probe" 2>/dev/null
+    return 1
+  fi
+  # Leave ourselves where we started, then drop the probe.
+  local back
+  back="$(awk -F: '/^0::/ {print $3; exit}' /proc/self/cgroup 2>/dev/null || true)"
+  [ -n "$back" ] && echo $$ >"$cgroup_root$back/cgroup.procs" 2>/dev/null
+  rmdir "$probe" 2>/dev/null
+  return 0
+}
+
+# Candidate order: the mount root first. A child of the mount root is always a
+# plain domain, which is why it works where the session scope does not. Fall
+# back to user.slice and then to our own scope for hosts that forbid that.
+CGROUP_BASE=""
+if [ -n "$cgroup_root" ]; then
+  for _cand in "$cgroup_root" "$cgroup_root/user.slice" \
+    "$cgroup_root$(awk -F: '/^0::/ {print $3; exit}' /proc/self/cgroup 2>/dev/null || true)"; do
+    [ -n "$_cand" ] || continue
+    if _cgroup_base_ok "$_cand"; then
+      CGROUP_BASE="$_cand"
+      break
+    fi
+  done
+fi
+
+cgroup_capable=0
+[ -n "$CGROUP_BASE" ] && cgroup_capable=1
+cgroup_note=""
+if [ "$cgroup_capable" -eq 0 ] && [ -n "$cgroup_root" ]; then
+  cgroup_note="no candidate base gave a writable non-threaded domain"
+fi
+
+# ---------------------------------------------------------------------------
+# Enforcement mechanism selection, in descending order of strength:
+#   cgroup  - real aggregate CPU quota; every descendant inherits it. Preferred.
+#   taskset - CPU affinity plus nice. Affinity bounds *where* work runs, not how
+#             much CPU time is consumed, so it is strictly weaker than a quota.
+#   off     - jobs limit only (still not unlimited; zig -j still applies).
+# ---------------------------------------------------------------------------
+if [ -n "${DECOMP_ENFORCE:-}" ]; then
+  enforce="$DECOMP_ENFORCE"
+elif [ "$cgroup_capable" -eq 1 ]; then
+  enforce=cgroup
+elif command -v taskset >/dev/null 2>&1; then
+  enforce=taskset
+else
+  enforce=off
+fi
+
+# ---------------------------------------------------------------------------
+# Convert the human quota ("200%") into cgroup v2 cpu.max ("200000 100000").
+# 100% == 100000us of CPU per 100000us period == one core of aggregate CPU.
+# ---------------------------------------------------------------------------
+quota_pct="${cpu_quota%%\%}"
+if ! [[ "$quota_pct" =~ ^[0-9]+$ ]]; then
+  quota_pct=200
+fi
+cgroup_period_us="${DECOMP_CGROUP_PERIOD_US:-100000}"
+cpu_max="$((quota_pct * 1000)) $cgroup_period_us"
+[ "$quota_pct" -eq 0 ] && cpu_max="max $cgroup_period_us"
+
+# ---------------------------------------------------------------------------
+# Exports.
+# ---------------------------------------------------------------------------
+export DECOMP_CPU_CORES="$cpu_cores"
+export DECOMP_BUILD_JOBS="$build_jobs"
+export DECOMP_CPU_QUOTA="$cpu_quota"
+export DECOMP_CPU_MAX="$cpu_max"
+export DECOMP_NICE="$nice_level"
+export DECOMP_CPUSET="$cpuset"
+export DECOMP_ENFORCE="$enforce"
+export DECOMP_CGROUP_CAPABLE="$cgroup_capable"
+export CGROUP_BASE
+
+# ---------------------------------------------------------------------------
+# `source` prints the policy for humans; `exec` prints shell assignments so the
+# caller can evaluate it. Both go to stdout only when explicitly requested, so
+# sourcing this file from a build script stays silent.
+# ---------------------------------------------------------------------------
+if [ "${1:-}" = "print" ]; then
+  cat <<EOF
+NSMB release:      $NSMB_RELEASE
+NSMB root:         $NSMB_ROOT
+logical CPUs:      $cpu_cores
+build jobs (-j):   $build_jobs
+CPU quota:         $cpu_quota
+cpu.max:           $cpu_max
+nice:              $nice_level
+cpuset (affinity): $cpuset
+enforcement:       $enforce
+cgroup v2 usable:  $([ "$cgroup_capable" -eq 1 ] && echo yes || echo no)
+cgroup base:       ${CGROUP_BASE:-<none>}
+zig:               $ZIG_BIN
+dsd:               $DSD_BIN
+objdiff stable:    $OBJDIFF_STABLE
+objdiff mcp:       $OBJDIFF_MCP
+EOF
+elif [ "${1:-}" = "export" ]; then
+  cat <<EOF
+export DECOMP_CPU_CORES='$cpu_cores'
+export DECOMP_BUILD_JOBS='$build_jobs'
+export DECOMP_CPU_QUOTA='$cpu_quota'
+export DECOMP_CPU_MAX='$cpu_max'
+export DECOMP_NICE='$nice_level'
+export DECOMP_CPUSET='$cpuset'
+export DECOMP_ENFORCE='$enforce'
+export DECOMP_CGROUP_CAPABLE='$cgroup_capable'
+export CGROUP_BASE='$CGROUP_BASE'
+export NSMB_ROOT='$NSMB_ROOT'
+export NSMB_RELEASE='$NSMB_RELEASE'
+export ZIG_BIN='$ZIG_BIN'
+export DSD_BIN='$DSD_BIN'
+export OBJDIFF_STABLE='$OBJDIFF_STABLE'
+export OBJDIFF_MCP='$OBJDIFF_MCP'
+export DECOMP_CPU_CORES_DETECTED='$cpu_cores'
+EOF
+fi

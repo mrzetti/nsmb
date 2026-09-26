@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# ghidra-mcp - start headless Ghidra for NSMB and expose it over MCP on stdio.
+#
+# Architecture (see .opencode/skills/nsmb-ghidra/SKILL.md):
+#
+#   OpenCode --stdio--> bridge_mcp_ghidra.py  (Python MCP server, this process)
+#                          |  HTTP on 127.0.0.1
+#                          v
+#                    GhidraMCPHeadlessServer   (Java, owns the Ghidra program)
+#
+# The MCP side is stdio, so nothing is exposed off the machine. The Java side binds
+# loopback only, which is where the analysis program lives.
+#
+# The headless server is a long-lived JVM whose auto-analysis is multi-threaded, so
+# it is started inside the same cgroup v2 CPU-quota cgroup as builds. Without that it
+# would consume every core on this shared host.
+#
+# Ghidra is optional. Matching works without it; this only adds semantic context.
+# If a prerequisite is missing this exits with a clear message rather than hanging,
+# so OpenCode reports the gap instead of stalling.
+
+set -euo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+RUNTIME="$TOOLS_DIR/ghidra-runtime"
+GHIJAR="$RUNTIME/ghidra"
+VENV="$RUNTIME/venv"
+BRIDGE_SRC="$TOOLS_DIR/ghidra-mcp-src/bridge_mcp_ghidra.py"
+CLASSPATH_FILE="$RUNTIME/classpath.txt"
+GHIDRA_PORT="${GHIDRA_MCP_PORT:-8089}"
+PIDFILE="$RUNTIME/headless.pid"
+LOGFILE="$RUNTIME/headless.log"
+
+# Which lazy tool groups the bridge should advertise.
+#
+# --lazy with --default-groups is required, not optional. The bridge ships 171
+# endpoints across 13 groups and loads only a subset by default, which is why
+# decompile_function and the other tools matching actually needs are absent from a
+# bare startup. These groups are exactly the ones the NSMB workflow uses:
+#
+#   headless  - project/program lifecycle, load program, run analysis
+#   function  - decompile, disassemble, callers, callees, signature, control flow
+#   listing   - list functions, strings, globals, data items, memory reads
+#   xref      - cross-references
+#   symbol    - symbol and label lookup
+#   datatype  - struct layout, enum values, type search and import
+#   program   - metadata, segments, program switching
+#   project   - create/open/list projects
+#   analysis  - analyze_control_flow, dataflow, struct field usage, call graph
+#
+# Deliberately excluded: malware (irrelevant to a Nintendo game, and not something
+# to advertise in this workspace), plus comment, documentation and emulation - none
+# are needed for matching, and every advertised tool costs context.
+#
+# Note: /check_connection and /get_version are registered directly by the headless
+# server rather than through @McpTool, so they are not MCP tools and will not appear
+# in the catalog. That is not a gap: the wrapper probes /check_connection over HTTP
+# before it hands over stdio, so a dead Ghidra fails loudly instead of producing a
+# bridge that silently cannot answer.
+GHIDRA_MCP_GROUPS="${GHIDRA_MCP_GROUPS:-headless,function,listing,xref,symbol,datatype,program,project,analysis}"
+
+die() { echo "ghidra-mcp: $*" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Prerequisites. Report each one precisely: "Ghidra is optional but X is missing"
+# is far more useful than a stack trace.
+# ---------------------------------------------------------------------------
+[ -d "$GHIJAR" ] || die "Ghidra not installed at $GHIJAR. Optional prerequisite - matching works without it. See .opencode/skills/nsmb-ghidra/SKILL.md"
+[ -x "$VENV/bin/python" ] || die "Ghidra bridge venv missing at $VENV. Create it with: uv venv $VENV --python 3.12 && VIRTUAL_ENV=$VENV uv pip install -r $TOOLS_DIR/ghidra-mcp-src/requirements.txt"
+[ -f "$BRIDGE_SRC" ] || die "Ghidra MCP bridge not found at $BRIDGE_SRC"
+[ -f "$CLASSPATH_FILE" ] || die "Ghidra classpath file missing at $CLASSPATH_FILE. Regenerate with .opencode/bin/build-ghidra-runtime"
+
+command -v java >/dev/null 2>&1 || die "java not found. Ghidra 12.0.4 needs Java 21. Optional prerequisite."
+
+"$VENV/bin/python" -c "import mcp" 2>/dev/null \
+  || die "the 'mcp' package is not installed in $VENV. Optional prerequisite."
+
+# ---------------------------------------------------------------------------
+# Is the headless server already up? If so, reuse it.
+# ---------------------------------------------------------------------------
+if curl -fsS --max-time 3 "http://127.0.0.1:${GHIDRA_PORT}/check_connection" >/dev/null 2>&1; then
+  echo "ghidra-mcp: reusing headless server on 127.0.0.1:${GHIDRA_PORT}" >&2
+  exec "$VENV/bin/python" "$BRIDGE_SRC" --transport stdio \
+    --lazy --default-groups "${GHIDRA_MCP_GROUPS:-headless,function,listing,xref,symbol,datatype,program,project}"
+fi
+
+# ---------------------------------------------------------------------------
+# Start the headless server, capped, in the background.
+# ---------------------------------------------------------------------------
+CP="$(cat "$CLASSPATH_FILE")"
+JAVA_OPTS="${GHIDRA_MCP_JAVA_OPTS:--Xmx3G -XX:+UseG1GC}"
+
+# Force loopback. The server refuses non-loopback binds without a token anyway, but
+# being explicit here means a later edit cannot accidentally expose it.
+export GHIDRA_MCP_BIND_ADDRESS=127.0.0.1
+
+# Join the build cgroup before launching, so the JVM and its analysis threads are
+# capped alongside builds rather than competing with them.
+CG=""
+if [ "$DECOMP_ENFORCE" = "cgroup" ] && [ -n "$CGROUP_BASE" ]; then
+  CG="$CGROUP_BASE/decomp-ai-build"
+  mkdir -p "$CG" 2>/dev/null && printf '%s\n' "$DECOMP_CPU_MAX" >"$CG/cpu.max" 2>/dev/null || true
+fi
+
+# Ghidra needs HOME for its user extension dir (~/.config/ghidra) where the
+# GhidraMCP plugin JAR is installed.
+export HOME="${HOME:-/root}"
+
+# -Djava.awt.headless=true is mandatory: there is no display on this host.
+launch() {
+  if [ -n "$CG" ] && echo $$ >"$CG/cgroup.procs" 2>/dev/null; then
+    exec java $JAVA_OPTS -Djava.awt.headless=true \
+      -cp "$CP" com.xebyte.headless.GhidraMCPHeadlessServer \
+      --bind 127.0.0.1 --port "$GHIDRA_PORT"
+  else
+    exec java $JAVA_OPTS -Djava.awt.headless=true \
+      -cp "$CP" com.xebyte.headless.GhidraMCPHeadlessServer \
+      --bind 127.0.0.1 --port "$GHIDRA_PORT"
+  fi
+}
+
+: >"$LOGFILE"
+if [ -n "$CG" ]; then
+  # Write our own pid into the cgroup, then start the JVM as a child. The child
+  # inherits the cgroup, so the whole JVM is covered.
+  echo $$ >"$CG/cgroup.procs" 2>/dev/null || true
+fi
+launch >"$LOGFILE" 2>&1 &
+HEADLESS_PID=$!
+echo "$HEADLESS_PID" >"$PIDFILE"
+
+cleanup() {
+  if [ -n "${HEADLESS_PID:-}" ] && kill -0 "$HEADLESS_PID" 2>/dev/null; then
+    kill "$HEADLESS_PID" 2>/dev/null || true
+    # Give the JVM a moment to release the port, then insist.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 "$HEADLESS_PID" 2>/dev/null || break
+      sleep 0.5
+    done
+    kill -9 "$HEADLESS_PID" 2>/dev/null || true
+  fi
+  rm -f "$PIDFILE"
+}
+trap cleanup EXIT INT TERM
+
+# ---------------------------------------------------------------------------
+# Wait for the server to answer. Fail loudly rather than handing the model a
+# bridge that silently cannot reach Ghidra.
+# ---------------------------------------------------------------------------
+ready=0
+for _ in $(seq 1 120); do
+  if ! kill -0 "$HEADLESS_PID" 2>/dev/null; then
+    echo "ghidra-mcp: headless server exited during startup. Log tail:" >&2
+    tail -25 "$LOGFILE" >&2
+    exit 1
+  fi
+  if curl -fsS --max-time 2 "http://127.0.0.1:${GHIDRA_PORT}/check_connection" >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "$ready" -ne 1 ]; then
+  echo "ghidra-mcp: headless server did not become ready within 120s. Log tail:" >&2
+  tail -25 "$LOGFILE" >&2
+  exit 1
+fi
+
+{
+  echo "ghidra-mcp: headless server ready on 127.0.0.1:${GHIDRA_PORT} (pid $HEADLESS_PID)"
+  echo "ghidra-mcp: capped by $DECOMP_ENFORCE (cpu.max $DECOMP_CPU_MAX)"
+  echo "ghidra-mcp: bridge transport stdio"
+} >&2
+
+# Hand stdin/stdout to the bridge. The trap above tears the JVM down on exit.
+exec "$VENV/bin/python" "$BRIDGE_SRC" \
+  --transport stdio \
+  --lazy \
+  --default-groups "$GHIDRA_MCP_GROUPS"

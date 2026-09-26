@@ -1,0 +1,104 @@
+Local patch: ghidra-mcp 5.7.0 headless server cannot start
+=========================================================
+
+Upstream bug, reproducible on a clean build of commit e6c325e
+("bump ghidra version & date in Dockerfile"), Ghidra 12.0.4, Java 21.
+
+Symptom
+-------
+    Ghidra initialized in headless mode
+    Failed to launch headless server: cannot add context to list
+    java.lang.IllegalArgumentException: cannot add context to list
+        at jdk.httpserver/sun.net.httpserver.ContextList.add(ContextList.java:37)
+        at jdk.httpserver/sun.net.httpserver.ServerImpl.createContext(ServerImpl.java:307)
+        at jdk.httpserver/sun.net.httpserver.HttpServerImpl.createContext(HttpServerImpl.java:74)
+        at com.xebyte.headless.GhidraMCPHeadlessServer.safeContext(GhidraMCPHeadlessServer.java:561)
+        at com.xebyte.headless.GhidraMCPHeadlessServer.registerEndpoints(GhidraMCPHeadlessServer.java:379)
+
+The server aborts in registerEndpoints() and never binds its port, so nothing can
+reach it and the MCP bridge has no backend.
+
+Cause
+-----
+GhidraMCPHeadlessServer.registerEndpoints() registers endpoints in two passes:
+
+  1. the annotation-scanned service endpoints, via AnnotationScanner over
+     @McpTool-annotated methods, and
+  2. its own manual "headless-specific" contexts.
+
+Two paths occur in both passes:
+
+    /create_folder   core/ProgramScriptService.java:588   (annotation)
+                    GhidraMCPHeadlessServer.java:379      (manual, headless)
+    /delete_file     core/ProgramScriptService.java:621   (annotation)
+                    GhidraMCPHeadlessServer.java:394      (manual, headless)
+
+com.sun.net.httpserver.HttpServer.createContext() throws IllegalArgumentException
+when a context for the path already exists, so the second pass dies on the first
+collision. The GUI plugin (GhidraMCPPlugin) registers a different manual set, which
+is why this only reproduces in headless mode.
+
+Note: `/list_methods` looks like a third collision but does not matter - the second
+occurrence is inside a javadoc example in core/McpTool.java, not an annotation.
+
+Fix
+---
+Track the bound paths and replace on a duplicate instead of throwing.
+
+Last-registration-wins is the correct semantics here, not a workaround. The
+service-side /create_folder and /delete_file both begin with
+`PluginTool tool = getToolFromProvider();` and return
+"requires GUI mode (PluginTool not available)" when it is null, which is always the
+case headless. The manual headless handlers delegate to HeadlessManagementService,
+which works headlessly. Because the manual contexts are registered after the
+scanner, replacing leaves the handler that actually functions in place.
+
+A plain `server.removeContext(path)` is not sufficient: HttpServerImpl throws
+IllegalStateException when the path is not bound, which is the common case. Hence the
+Set, so removeContext is only reached on a genuine duplicate.
+
+Applied patch
+-------------
+    --- a/src/main/java/com/xebyte/headless/GhidraMCPHeadlessServer.java
+    +++ b/src/main/java/com/xebyte/headless/GhidraMCPHeadlessServer.java
+
+    @@ field declarations
+         private int registeredEndpointCount;
+    +
+    +    // Local patch: paths already bound to an HttpContext, so a duplicate
+    +    // registration can replace rather than throw. See
+    +    // .opencode/patches/ghidra-mcp-5.7.0-headless-duplicate-context.patch
+    +    private final java.util.Set<String> registeredContexts =
+    +            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    @@ safeContext()
+         private com.sun.net.httpserver.HttpContext safeContext(
+                 String path, com.sun.net.httpserver.HttpHandler handler) {
+    +        // Local patch: createContext() throws on a duplicate path. /create_folder and
+    +        // /delete_file are registered by both the annotation scanner and the manual
+    +        // headless set, which aborts startup. See
+    +        // .opencode/patches/ghidra-mcp-5.7.0-headless-duplicate-context.patch
+    +        if (!registeredContexts.add(path)) {
+    +            // Already present: replace it. The later registration is the
+    +            // headless-specific one and must win, because the service-side
+    +            // /create_folder and /delete_file require a GUI PluginTool and would
+    +            // otherwise answer "requires GUI mode".
+    +            server.removeContext(path);
+    +        }
+             return server.createContext(path, exchange -> {
+
+Verified
+--------
+    before:  Failed to launch headless server: cannot add context to list
+    after :  Registered 202 REST API endpoints
+             HTTP server started on 127.0.0.1:8089
+             GhidraMCP Headless Server v5.7.0-headless running on port 8089
+             GET /check_connection -> Connection OK - GhidraMCP Headless Server v5.7.0-headless
+             GET /mcp/schema        -> 171 endpoints
+
+Scope
+-----
+Applied to the vendored checkout at .tools/ghidra-mcp-src, which is gitignored and
+is not part of the NSMB repository. This is not an NSMB change, is not committed
+upstream, and does not touch the NSMB project. The installer
+.opencode/bin/build-ghidra-runtime re-applies it when rebuilding.

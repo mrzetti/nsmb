@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# build-ghidra-runtime - (re)build the local Ghidra MCP runtime for NSMB.
+#
+# One-time or repair script. It does the steps that .tools/ghidra-mcp cannot do for
+# itself: install the Ghidra JARs into the local Maven repository, build the
+# GhidraMCP plugin JAR, deploy it as a user extension, create the bridge environment
+# with uv, and write the Ghidra classpath that the headless server needs.
+#
+# All output stays under .tools/ (gitignored) plus ~/.m2 and ~/.config/ghidra.
+# Nothing proprietary is involved: Ghidra, Maven artifacts, and Python packages are
+# all freely available.
+#
+# Usage: .opencode/bin/build-ghidra-runtime
+
+set -euo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+RUNTIME="$TOOLS_DIR/ghidra-runtime"
+GHIJAR="${GHIDRA_INSTALL_DIR:-$RUNTIME/ghidra/ghidra_12.0.4_PUBLIC}"
+SRC="$TOOLS_DIR/ghidra-mcp-src"
+VENV="$RUNTIME/venv"
+
+step() { echo; echo "=== $* ==="; }
+
+step "tool versions"
+command -v java >/dev/null 2>&1 && java -version 2>&1 | head -1 || { echo "java missing"; exit 1; }
+command -v mvn  >/dev/null 2>&1 && mvn -version  2>&1 | head -1 || { echo "maven missing"; exit 1; }
+command -v uv   >/dev/null 2>&1 && uv --version || { echo "uv missing (https://astral.sh/uv)"; exit 1; }
+[ -d "$GHIJAR" ] || { echo "Ghidra not found at $GHIJAR"; exit 1; }
+echo "ghidra: $GHIJAR"
+
+step "ghidra-mcp source"
+if [ ! -d "$SRC/.git" ]; then
+  git clone --depth 1 https://github.com/hacr-lab/ghidra-mcp.git "$SRC"
+fi
+(cd "$SRC" && git log --oneline -1)
+
+# The plugin enforces that its pinned ghidra.version matches the installed Ghidra.
+want="$(grep -m1 -oP '(?<=<ghidra.version>)[^<]+' "$SRC/pom.xml")"
+have="$(basename "$(dirname "$GHIJAR")")"
+if [ "$want" != "$have" ]; then
+  echo "VERSION MISMATCH: plugin pins ghidra $want, installed is $have" >&2
+  echo "Install ghidra_${want}_PUBLIC and set GHIDRA_INSTALL_DIR to it." >&2
+  exit 1
+fi
+echo "version match: ghidra $want"
+
+step "install Ghidra JARs into ~/.m2"
+(cd "$SRC" && GHIJAR="$GHIJAR" python3 -m tools.setup install-ghidra-deps --ghidra-path "$GHIJAR" 2>&1 \
+  | grep -E "BUILD|ERROR" | tail -4)
+
+step "build the GhidraMCP plugin"
+(cd "$SRC" && python3 -m tools.setup build 2>&1 | grep -E "BUILD|Building zip|ERROR" | tail -6)
+
+step "deploy as a user extension"
+# `deploy` also tries to launch the Ghidra GUI, which assumes Windows and fails on
+# this host. The install steps all complete first, so a non-zero exit here is
+# expected and harmless.
+(cd "$SRC" && python3 -m tools.setup deploy --ghidra-path "$GHIJAR" 2>&1 \
+  | grep -E "Installed|Copied|ERROR" | tail -6) || true
+
+# Ghidra wants "KEY: value" in Module.manifest; this project ships "KEY=value",
+# which makes Ghidra log a manifest error on every start.
+mf="$HOME/.config/ghidra/$(basename "$(dirname "$GHIJAR")")/Extensions/GhidraMCP/Module.manifest"
+if [ -f "$mf" ]; then
+  sed -i 's/^\([A-Z_]*\)=/\1: /' "$mf"
+  echo "normalised $mf"
+fi
+
+step "bridge environment (uv)"
+if [ ! -x "$VENV/bin/python" ]; then
+  uv venv "$VENV" --python 3.12
+fi
+VIRTUAL_ENV="$VENV" uv pip install -r "$SRC/requirements.txt" 2>&1 | tail -3
+"$VENV/bin/python" -c "import mcp, requests; print('bridge deps ok; requests', requests.__version__)"
+
+step "Ghidra classpath"
+# The built jar is a Ghidra extension, not an executable fat jar, so the headless
+# server must be launched against Ghidra's own module classpath plus this jar.
+ext_jar="$(find "$HOME/.config/ghidra" -name 'GhidraMCP-*.jar' 2>/dev/null | head -1)"
+[ -n "$ext_jar" ] || { echo "GhidraMCP jar not found under ~/.config/ghidra"; exit 1; }
+CP="$(find "$GHIJAR/Ghidra/Framework" "$GHIJAR/Ghidra/Features" "$GHIJAR/Ghidra/Processors" \
+        -name '*.jar' 2>/dev/null | tr '\n' ':')$ext_jar"
+mkdir -p "$RUNTIME"
+printf '%s' "$CP" >"$CLASSPATH_FILE"
+echo "wrote $CLASSPATH_FILE ($(printf '%s' "$CP" | tr ':' '\n' | grep -c jar) jars)"
+
+step "verify"
+"$VENV/bin/python" -c "import mcp" && echo "  mcp import ok"
+java -cp "$CP" com.xebyte.headless.GhidraMCPHeadlessServer --version 2>&1 | grep -v "manifest" | tail -2
+
+cat <<EOF
+
+Ghidra runtime ready.
+
+  ghidra   : $GHIJAR
+  plugin   : $ext_jar
+  bridge   : $SRC/bridge_mcp_ghidra.py  (venv $VENV)
+  classpath: $CLASSPATH_FILE
+
+Ghidra is OPTIONAL. objdiff matching does not need it. Enable the MCP server in
+opencode.jsonc by setting "disabled": false on the ghidra server, then verify with
+  opencode mcp list
+EOF

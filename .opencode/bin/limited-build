@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# limited-build - run an NSMB decompilation build under the local CPU policy.
+#
+# Usage:
+#   limited-build zig build single A2DE -- <objpath>
+#   limited-build zig build objdiff
+#   limited-build <any command> [args...]
+#
+# Enforces, in this order of strength:
+#   1. cgroup v2 CPU quota  - a real aggregate CPU cap. The launched command
+#      AND every process it spawns (zig -> wine -> wineserver -> mwccarm) stays
+#      in that cgroup, so child processes cannot escape the cap.
+#   2. nice                 - scheduling priority only. NOT a CPU cap.
+#   3. taskset               - CPU affinity only. NOT a CPU cap.
+#
+# For `zig build` invocations, `-j<jobs>` is injected automatically so Zig's
+# own scheduler honours the same job budget. This script is what every build
+# path in this workspace goes through; do not call a bare `zig build` from
+# agent automation.
+
+set -euo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+if [ "$#" -eq 0 ]; then
+  echo "limited-build: no command given" >&2
+  exit 2
+fi
+
+# ---------------------------------------------------------------------------
+# Build the command, injecting the zig job limit in the correct position.
+#
+# NSMB's objdiff unit command (produced by `zig build objdiff`) is:
+#     zig build single <RELEASE> -- <base_path>
+# `zig build` accepts -j/--jobs as a top-level option, so it must be inserted
+# immediately after the `build` subcommand, before the step name and before the
+# `--` separator that introduces the unit's own arguments.
+# ---------------------------------------------------------------------------
+argv=()
+inject_jobs=0
+# Detect a caller-supplied job limit. Must cover BOTH forms zig accepts:
+#   -j7             (attached short form)
+#   -j 7            (separated short form)
+#   --jobs=7        (attached long form)
+#   --jobs 7        (separated long form)
+# Matching only a bare `-j` silently produced `-j2 -j7`, overriding the caller.
+caller_set_jobs=0
+for a in "$@"; do
+  case "$a" in
+    -j|-j[0-9]*|--jobs|--jobs=*|--jobs[0-9]*) caller_set_jobs=1 ;;
+  esac
+done
+
+for arg in "$@"; do
+  argv+=("$arg")
+  if [ "$inject_jobs" -eq 0 ] && [ "$arg" = "build" ]; then
+    # Only for zig invocations, and only if the caller did not already set -j.
+    if [ "${argv[0]##*/}" = "zig" ] && [ "$caller_set_jobs" -eq 0 ]; then
+      argv+=("-j${DECOMP_BUILD_JOBS}")
+    fi
+    inject_jobs=1
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# cgroup containment.
+# ---------------------------------------------------------------------------
+CG=""
+CLEAN_CG=0
+if [ "$DECOMP_ENFORCE" = "cgroup" ] && [ -n "$CGROUP_BASE" ]; then
+  # Reuse a stable name per policy so repeated builds share one cgroup, and a
+  # crashed build cannot leak a new cgroup on every attempt.
+  CG="$CGROUP_BASE/decomp-ai-build"
+  if mkdir -p "$CG" 2>/dev/null; then
+    CLEAN_CG=1
+  else
+    CG=""
+  fi
+  if [ -n "$CG" ]; then
+    printf '%s\n' "$DECOMP_CPU_MAX" >"$CG/cpu.max" 2>/dev/null || true
+    # A stale cgroup may still hold processes from a previous run; they already
+    # carry the cap, so leave them alone.
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Assemble the final command: taskset (affinity) -> cgroup move -> nice -> exec.
+# ---------------------------------------------------------------------------
+prefix=()
+[ "$DECOMP_ENFORCE" = "taskset" ] && command -v taskset >/dev/null 2>&1 && prefix+=("taskset" "-c" "$DECOMP_CPUSET")
+
+# Re-raise niceness if we can. `nice` silently does nothing without privilege
+# to lower the value, so never treat it as enforcement.
+renice_cmd=()
+if [ "$DECOMP_NICE" -gt 0 ]; then
+  renice_cmd=("nice" "-n" "$DECOMP_NICE")
+fi
+
+if [ -n "$CG" ]; then
+  # Fork a shell that joins the cgroup, then execs the real build. The shell is
+  # replaced (not a child) so the build is the direct process; every descendant
+  # inherits the cgroup by normal inheritance rules.
+  exec /bin/bash -c '
+    set -euo pipefail
+    cg="$1"; shift
+    if ! echo $$ >"$cg/cgroup.procs" 2>/dev/null; then
+      echo "limited-build: warning: could not join cgroup $cg" >&2
+    fi
+    exec "$@"
+  ' _ "$CG" ${prefix+"${prefix[@]}"} ${renice_cmd+"${renice_cmd[@]}"} "${argv[@]}"
+else
+  exec ${prefix+"${prefix[@]}"} ${renice_cmd+"${renice_cmd[@]}"} "${argv[@]}"
+fi

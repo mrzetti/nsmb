@@ -1,0 +1,311 @@
+#!/usr/bin/env bash
+# decomp-state - track per-symbol matching progress and preserve the best source.
+#
+# Matching regresses. objdiff match% is the only measure of progress that counts,
+# so every attempt is recorded numerically and the best-scoring source is kept
+# verbatim. Nothing here uses destructive git operations: the best snapshot is a
+# plain file copy, and a "revert" is a copy back.
+#
+# Usage:
+#   decomp-state begin  <SYMBOL> --unit <UNIT> --source <FILE> [--percent N]
+#   decomp-state record <SYMBOL> --percent N --hypothesis "..." [--unit U] [--source F]
+#   decomp-state best    <SYMBOL>
+#   decomp-state show    [<SYMBOL>]
+#   decomp-state keep    <SYMBOL>     # snapshot current source as best
+#   decomp-state revert  <SYMBOL>     # restore best source snapshot
+#   decomp-state forget  <SYMBOL>
+#
+# Percentages accept a float (e.g. 71.83) or a trailing % (71.83%).
+
+set -euo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+STATE_DIR="$NSMB_ROOT/.decomp-ai"
+STATE_FILE="$STATE_DIR/state.json"
+BEST_DIR="$STATE_DIR/best"
+LOG_DIR="$STATE_DIR/logs"
+mkdir -p "$BEST_DIR" "$LOG_DIR"
+
+PY="${PYTHON:-python3}"
+command -v "$PY" >/dev/null 2>&1 || { echo "decomp-state: python3 required" >&2; exit 127; }
+
+cmd="${1:-show}"
+shift || true
+
+# Parse the shared flags. Leading positional args are joined into the symbol name
+# so unquoted symbols like "System::foo" work.
+SYMBOL=""
+UNIT=""
+SOURCE=""
+PERCENT=""
+HYPOTHESIS=""
+REST=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --unit) UNIT="${2:?}"; shift 2 ;;
+    --source) SOURCE="${2:?}"; shift 2 ;;
+    --percent) PERCENT="${2:?}"; shift 2 ;;
+    --hypothesis) HYPOTHESIS="${2:?}"; shift 2 ;;
+    --summary) REST+=("${2:?}"); shift 2 ;;
+    -*) echo "decomp-state: unknown flag $1" >&2; exit 2 ;;
+    *) if [ -z "$SYMBOL" ]; then SYMBOL="$1"; else SYMBOL="$SYMBOL $1"; fi; shift ;;
+  esac
+done
+
+# Key used for the state map. Case-sensitive, '/' kept readable, ':' kept because
+# C++ symbols use it.
+key() { printf '%s' "${1:-$SYMBOL}"; }
+KEY="$(key "$SYMBOL")"
+# `show` with no argument lists every tracked symbol, so it must not require one.
+if [ -z "$KEY" ] && [ "$cmd" != "show" ]; then
+  echo "decomp-state: a symbol name is required for '$cmd'" >&2
+  exit 2
+fi
+
+safe() { printf '%s' "$1" | sed 's/[^A-Za-z0-9._:+-]/_/g'; }
+KEYFILE="$(safe "$KEY")"
+
+export STATE_FILE BEST_DIR LOG_DIR NSMB_RELEASE
+
+case "$cmd" in
+  begin)
+    [ -n "$UNIT" ] || { echo "decomp-state begin: --unit is required" >&2; exit 2; }
+    [ -n "$SOURCE" ] || { echo "decomp-state begin: --source is required" >&2; exit 2; }
+    "$PY" - "$STATE_FILE" "$KEY" "$UNIT" "$SOURCE" "$PERCENT" <<'PY'
+import json, os, subprocess, sys, time
+state_file, key, unit, source, percent = sys.argv[1:6]
+try:
+    st = json.load(open(state_file))
+except Exception:
+    st = {"schema": 1, "symbols": {}}
+def rev():
+    try:
+        return subprocess.run(["git","rev-parse","--short","HEAD"],capture_output=True,
+                              text=True).stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
+entry = {
+    "release": os.environ.get("NSMB_RELEASE",""),
+    "unit": unit,
+    "symbol": key,
+    "source_file": source,
+    "baseline_percent": float(percent.rstrip("%")) if percent else None,
+    "current_percent": float(percent.rstrip("%")) if percent else None,
+    "best_percent": float(percent.rstrip("%")) if percent else None,
+    "attempt_count": 0,
+    "non_improving_count": 0,
+    "hypotheses": [],
+    "best_source_snapshot": None,
+    "best_source_revision": None,
+    "last_objdiff_summary": None,
+    "opened_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+}
+st.setdefault("symbols", {})[key] = entry
+st["current_symbol"] = key
+st["active"] = True
+st["release"] = os.environ.get("NSMB_RELEASE", st.get("release",""))
+json.dump(st, open(state_file,"w"), indent=2)
+print(f"tracking {key} (unit {unit}, source {source})")
+PY
+    ;;
+
+  record)
+    [ -n "$PERCENT" ] || { echo "decomp-state record: --percent is required" >&2; exit 2; }
+    "$PY" - "$STATE_FILE" "$KEY" "$PERCENT" "$HYPOTHESIS" "$UNIT" "$SOURCE" "$BEST_DIR" "$LOG_DIR" <<'PY'
+import json, os, shutil, subprocess, sys, time
+(state_file, key, percent, hypothesis, unit, source, best_dir, log_dir) = sys.argv[1:9]
+st = json.load(open(state_file))
+syms = st.setdefault("symbols", {})
+e = syms.get(key)
+if e is None:
+    e = {"release": os.environ.get("NSMB_RELEASE",""), "unit": unit, "symbol": key,
+         "source_file": source, "baseline_percent": None, "current_percent": None,
+         "best_percent": None, "attempt_count": 0, "non_improving_count": 0,
+         "hypotheses": [], "best_source_snapshot": None,
+         "best_source_revision": None, "last_objdiff_summary": None}
+    syms[key] = e
+pct = float(percent.rstrip("%"))
+if unit: e["unit"] = unit
+if source: e["source_file"] = source
+if e.get("baseline_percent") is None:
+    e["baseline_percent"] = pct
+
+prev_best = e.get("best_percent")
+prev_cur = e.get("current_percent")
+e["attempt_count"] = int(e.get("attempt_count", 0)) + 1
+e["current_percent"] = pct
+
+if prev_best is None or pct > prev_best:
+    delta = None if prev_best is None else pct - prev_best
+    e["best_percent"] = pct
+    e["non_improving_count"] = 0
+    verdict = "BEST"
+    # Preserve the winning source before any later experiment can overwrite it.
+    # Fall back to the source path recorded at begin, so `record` without an
+    # explicit --source still snapshots the file it is actually editing.
+    snap_src = source or e.get("source_file")
+    if snap_src and os.path.isfile(snap_src):
+        snap = os.path.join(best_dir, key.replace("/", "%") + ".best")
+        shutil.copy2(snap_src, snap)
+        e["best_source_snapshot"] = os.path.relpath(snap, os.path.dirname(state_file))
+        try:
+            e["best_source_revision"] = subprocess.run(
+                ["git","rev-parse","--short","HEAD"],capture_output=True,text=True).stdout.strip()
+        except Exception:
+            e["best_source_revision"] = None
+    else:
+        print(f"  note: no source file to snapshot (looked for {snap_src!r})")
+else:
+    delta = None if prev_cur is None else pct - prev_cur
+    e["non_improving_count"] = int(e.get("non_improving_count", 0)) + 1
+    verdict = "REGRESSION" if pct < (prev_best or 0) else "no-improve"
+
+if hypothesis:
+    e["hypotheses"].append({
+        "attempt": e["attempt_count"],
+        "hypothesis": hypothesis,
+        "percent": pct,
+        "verdict": verdict,
+        "delta_vs_previous_attempt": delta,
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    })
+e["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+st["current_symbol"] = key
+st["active"] = True
+json.dump(st, open(state_file,"w"), indent=2)
+
+b = e.get("baseline_percent")
+print(f"{key}  attempt {e['attempt_count']}  {pct:.2f}%  [{verdict}]")
+if delta is not None:
+    print(f"  delta vs previous attempt: {delta:+.2f}")
+if b is not None:
+    print(f"  total vs baseline: {pct - b:+.2f}   best: {e.get('best_percent'):.2f}%  "
+          f"non-improving streak: {e['non_improving_count']}")
+if verdict == "REGRESSION" and e.get("best_source_snapshot"):
+    print(f"  best source preserved at {e['best_source_snapshot']}  "
+          f"(use: decomp-state revert '{key}')")
+if verdict != "BEST" and e.get("best_source_snapshot"):
+    print(f"  consider: decomp-state revert '{key}'")
+PY
+    ;;
+
+  keep|revert)
+    "$PY" - "$STATE_FILE" "$KEY" "$BEST_DIR" "$cmd" <<'PY'
+import json, os, shutil, subprocess, sys, time
+state_file, key, best_dir, mode = sys.argv[1:5]
+st = json.load(open(state_file))
+e = st.get("symbols", {}).get(key)
+if not e:
+    print(f"decomp-state: no state for {key}", file=sys.stderr); sys.exit(1)
+src = e.get("source_file")
+if not src:
+    print("decomp-state: no source_file recorded", file=sys.stderr); sys.exit(1)
+if not os.path.isfile(src):
+    print(f"decomp-state: source file missing: {src}", file=sys.stderr); sys.exit(1)
+snap = os.path.join(best_dir, key.replace("/", "%") + ".best")
+
+if mode == "keep":
+    # Promote whatever is on disk right now to be the new best. Use this after
+    # a manual edit that objdiff has already confirmed.
+    shutil.copy2(src, snap)
+    e["best_source_snapshot"] = os.path.relpath(snap, os.path.dirname(state_file))
+    e["best_percent"] = e.get("current_percent", e.get("best_percent"))
+    e["non_improving_count"] = 0
+    try:
+        e["best_source_revision"] = subprocess.run(
+            ["git","rev-parse","--short","HEAD"],capture_output=True,text=True).stdout.strip()
+    except Exception:
+        pass
+    e["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    json.dump(st, open(state_file,"w"), indent=2)
+    print(f"kept current source as best for {key} ({e.get('best_percent')}%): {snap}")
+else:
+    # revert: restore the preserved best source over the current working copy.
+    if not os.path.isfile(snap):
+        print(f"decomp-state: no best snapshot for {key} (expected {snap})", file=sys.stderr)
+        sys.exit(1)
+    shutil.copy2(snap, src)
+    e["current_percent"] = e.get("best_percent")
+    e["non_improving_count"] = 0
+    e["last_revert_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    e["timestamp"] = e["last_revert_at"]
+    json.dump(st, open(state_file,"w"), indent=2)
+    print(f"reverted {key} to best source ({e.get('best_percent')}%): {src}")
+PY
+    ;;
+
+  best)
+    "$PY" - "$STATE_FILE" "$KEY" "$BEST_DIR" <<'PY'
+import json, os, sys
+state_file, key, best_dir = sys.argv[1:4]
+st = json.load(open(state_file))
+e = st.get("symbols", {}).get(key)
+if not e:
+    print(f"decomp-state: no state for {key}", file=sys.stderr); sys.exit(1)
+print(f"best snapshot: {e.get('best_source_snapshot') or '(none)'}")
+if e.get("best_source_revision"):
+    print(f"best revision: {e['best_source_revision']}")
+print(f"best percent : {e.get('best_percent')}")
+PY
+    ;;
+
+  show)
+    "$PY" - "$STATE_FILE" "$KEY" <<'PY'
+import json, os, sys
+state_file, key = sys.argv[1:3]
+st = json.load(open(state_file))
+syms = st.get("symbols", {})
+if key:
+    e = syms.get(key)
+    if not e:
+        print(f"decomp-state: no state for {key}"); raise SystemExit(0)
+    print(json.dumps(e, indent=2))
+else:
+    if not syms:
+        print("no symbols tracked yet"); raise SystemExit(0)
+    print(f"tracked symbols: {len(syms)}")
+    for k, e in syms.items():
+        print(f"  {k}")
+        print(f"    unit      {e.get('unit')}")
+        print(f"    source    {e.get('source_file')}")
+        print(f"    base      {e.get('baseline_percent')}")
+        print(f"    current   {e.get('current_percent')}   best {e.get('best_percent')}")
+        print(f"    attempts  {e.get('attempt_count')}   non-improving {e.get('non_improving_count')}")
+        # `or []` guards a missing/None key but NOT an empty list, so indexing
+        # [-1] directly raised IndexError for any symbol with no recorded
+        # attempt yet. A freshly `begin`-ed symbol has hypotheses == [].
+        hs = e.get("hypotheses") or []
+        h = hs[-1] if hs else None
+        if h: print(f"    last hypothesis: {h.get('hypothesis')}")
+        else: print("    last hypothesis: (none yet - no attempt recorded)")
+PY
+    ;;
+
+  forget)
+    "$PY" - "$STATE_FILE" "$KEY" "$BEST_DIR" <<'PY'
+import json, os, sys
+state_file, key, best_dir = sys.argv[1:4]
+st = json.load(open(state_file))
+e = st.get("symbols", {}).pop(key, None)
+if e is None:
+    print(f"decomp-state: no state for {key}"); raise SystemExit(0)
+snap = e.get("best_source_snapshot")
+if snap:
+    p = os.path.join(os.path.dirname(state_file), snap)
+    if os.path.isfile(p): os.remove(p)
+st["current_symbol"] = None if st.get("current_symbol") == key else st.get("current_symbol")
+st["active"] = bool(st.get("symbols"))
+json.dump(st, open(state_file,"w"), indent=2)
+print(f"forgot {key}")
+PY
+    ;;
+
+  *)
+    sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac

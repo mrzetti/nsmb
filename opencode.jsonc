@@ -1,0 +1,134 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // NSMB (Nintendo DS) matching decompilation, configured for OpenCode V2.
+  //
+  // The authoritative oracle is objdiff: target object vs compiled base object.
+  // Ghidra is supporting evidence, never ground truth.
+  //
+  // Nothing here weakens upstream .gitignore. ROMs, .nds files, extracted data,
+  // delinked objects and the proprietary mwccarm compiler must never be tracked.
+  "default_agent": "nsmb-orchestrator",
+
+  "mcp": {
+    "timeout": {
+      // objdiff `build` shells out to zig + wine + mwccarm under a CPU cap, so a
+      // cold first compile is slower than an uncapped one. Allow headroom
+      // without letting a hung build hang the session forever.
+      "execution": 900000
+    },
+    "servers": {
+      // Experimental objdiff MCP server from encounter/objdiff PR #400.
+      //
+      // This is the official stable objdiff CLI (v3.8.1). The MCP build is a
+      // separate binary pinned to the reviewed PR head, so the stable CLI used
+      // by `zig build report` is never overwritten. See DECOMP_AI.md for the pin.
+      //
+      // The command is a local wrapper, not the raw binary. The wrapper moves
+      // the MCP server process into a cgroup v2 CPU-quota cgroup *before* it
+      // accepts any request, so every `build()` it starts (zig -> wine ->
+      // mwccarm) inherits the cap. This is why MCP-triggered builds cannot
+      // bypass the resource policy. stdio only; nothing is exposed on a port.
+      "objdiff": {
+        "type": "local",
+        "command": ["./.opencode/bin/objdiff-mcp", "--project", "."],
+        "cwd": ".",
+        "environment": {
+          "NSMB_ROOT": "{env:NSMB_ROOT}",
+          "NSMB_RELEASE": "{env:NSMB_RELEASE}",
+          "DECOMP_BUILD_JOBS": "{env:DECOMP_BUILD_JOBS}",
+          "DECOMP_CPU_QUOTA": "{env:DECOMP_CPU_QUOTA}",
+          "DECOMP_NICE": "{env:DECOMP_NICE}"
+        },
+        "codemode": true,
+        "timeout": { "startup": 60000 }
+      },
+
+      // Headless Ghidra for ARM9/ARMv5T decompilation evidence.
+      //
+      // Optional. Matching works without it; Ghidra adds semantic context
+      // (pseudocode, callers, xrefs, types, globals) that objdiff cannot give.
+      //
+      // The wrapper starts the Java headless server inside the CPU-capped cgroup,
+      // waits for it to answer, then execs the Python MCP bridge on stdio and
+      // tears the JVM down on exit. The bridge is started with an explicit set of
+      // lazy tool groups, because it otherwise advertises only a subset that is
+      // missing decompile_function and the other tools matching needs.
+      //
+      // The MCP side is stdio. The Java side binds 127.0.0.1 only.
+      //
+      // If a prerequisite is missing the wrapper exits with a specific message
+      // rather than hanging, so the gap is reported instead of stalling a session.
+      // Rebuild the runtime with: .opencode/bin/build-ghidra-runtime
+      "ghidra": {
+        "type": "local",
+        "command": ["./.opencode/bin/ghidra-mcp"],
+        "cwd": ".",
+        "codemode": true,
+        "timeout": { "startup": 180000 }
+      }
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // OpenCode V2 permission format. Three things matter and all three were wrong
+  // in the first draft of this file, which made every rule below inert:
+  //   * the key is `permission`, singular      (not `permissions`)
+  //   * the action for shell is `bash`         (not `shell`)
+  //   * the value is a MAP of glob -> action   (not an array of objects)
+  // A more specific glob overrides `*`. Omitting a tool entirely leaves that
+  // tool at its built-in default, which is what the top-level block below does:
+  // it states only the exceptions, not the normal case.
+  // -------------------------------------------------------------------------
+  "permission": {
+    "bash": {
+      // Delivery to the user's own fork is authorised. origin = mrzetti/nsmb.
+      "git add*": "allow",
+      "git commit*": "allow",
+      "git push origin*": "allow",
+      "git push mrzetti*": "allow",
+      "gh pr create*": "allow",
+      "gh pr list*": "allow",
+      "gh pr view*": "allow",
+      "gh pr diff*": "allow",
+      "gh pr comment*": "allow",
+      "gh api repos/mrzetti/*": "allow",
+
+      // upstream is the PUBLIC contribution gate. NSMB maintainers review it and
+      // contributing.md applies to it directly. Never pushed to from here; the
+      // remote's own push URL is also disabled as a second, independent guard.
+      "git push upstream*": "deny",
+      "gh api repos/NSMB-Decomp/*": "deny",
+
+      // Rewriting published history.
+      "git push --all*": "deny",
+      "git push --mirror*": "deny",
+      "git push -f*": "deny",
+      "git push --force*": "deny",
+
+      // Operations that destroy local work rather than shipping it. A
+      // contributor may have unrelated in-progress changes at any time, and
+      // "reset hard and retry" is not an available recovery strategy.
+      // .opencode/bin/decomp-state revert is.
+      "git reset --hard*": "deny",
+      "git clean -fd*": "deny",
+      "git clean -fdx*": "deny",
+      "git checkout --*": "deny",
+      "git restore*": "deny",
+      "git branch -D*": "deny",
+
+      // Destructive or secret-leaking gh operations.
+      "gh release*": "deny",
+      "gh repo delete*": "deny",
+      "gh secret*": "deny"
+    }
+  },
+
+  "skills": [
+    // All NSMB skills are discovered from .opencode/skills automatically; this
+    // array only adds the external research checkout, which lives outside the
+    // repository so its (largely PowerPC-oriented) content never lands in
+    // tracked NSMB source.
+    "../decomp-research-ai"
+  ]
+}

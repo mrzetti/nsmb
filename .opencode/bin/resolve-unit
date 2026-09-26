@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# resolve-unit - resolve an objdiff unit name to the paths the build and diff
+# tools actually need.
+#
+# Why this exists
+# ---------------
+# `zig build single` does NOT take a unit name. build.zig's getSourceByDest()
+# compares its argument against each unit's `base_path` **verbatim**, and dsd
+# writes those as long relative paths:
+#
+#   config/A2DE/arm9/../../../build/A2DE/src/system/vblank.o
+#
+# Passing the unit name (`src/system/vblank`) makes build.zig panic with
+# "Could not find the source". The objdiff MCP server does not have this problem
+# because it reads base_path out of objdiff.json itself.
+#
+# Usage
+#   resolve-unit <unit-name>            print the base_path
+#   resolve-unit <unit-name> base       print the base object path
+#   resolve-unit <unit-name> target     print the target object path
+#   resolve-unit <unit-name> source     print the owning source file
+#   resolve-unit <unit-name> ctx        print the scratch ctx_path, if any
+#   resolve-unit <unit-name> json       print the whole unit object
+#   resolve-unit <unit-name> command    print a ready-to-run limited-build command
+#   resolve-unit --filter <substring>   list matching unit names (for discovery)
+#
+# Exit codes: 0 found, 1 not found, 2 bad usage / no objdiff.json
+
+set -uo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+OBJDIFF_JSON="$NSMB_ROOT/objdiff.json"
+[ -f "$OBJDIFF_JSON" ] || {
+  echo "resolve-unit: $OBJDIFF_JSON not found. Generate it with:" >&2
+  echo "  ./.opencode/bin/limited-build zig build objdiff" >&2
+  exit 2
+}
+
+# Discovery mode.
+if [ "${1:-}" = "--filter" ]; then
+  [ "$#" -ge 2 ] || { echo "resolve-unit: --filter needs a substring" >&2; exit 2; }
+  exec python3 - "$OBJDIFF_JSON" "$2" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+needle = sys.argv[2].lower()
+units = [u for u in d["units"] if needle in u["name"].lower()]
+if not units:
+    print(f"no unit matches {sys.argv[2]!r}")
+    raise SystemExit(1)
+compilable = [u for u in units if u.get("base_path")]
+print(f"{len(units)} match(es), {len(compilable)} compilable:\n")
+for u in units[:60]:
+    mark = " " if u.get("base_path") else "-"
+    src = (u.get("metadata") or {}).get("source_path") or "(no source: dsd gap stub)"
+    print(f" {mark} {u['name']:<45} {src}")
+if len(units) > 60:
+    print(f" ... and {len(units) - 60} more")
+# The mark explains itself: a gap stub has no base_path and cannot be built or matched.
+print("\n' ' = compilable and matchable;  '-' = dsd gap stub, no source")
+PY
+fi
+
+[ "$#" -ge 1 ] || { echo "resolve-unit: need a unit name (try: resolve-unit --filter vblank)" >&2; exit 2; }
+
+UNIT="$1"
+WHAT="${2:-base_path}"
+
+exec python3 - "$OBJDIFF_JSON" "$UNIT" "$WHAT" "$NSMB_ROOT" "$here/limited-build" "$NSMB_RELEASE" <<'PY'
+import json, os, sys
+
+objdiff_json, unit, what, root, limited_build, release = sys.argv[1:7]
+d = json.load(open(objdiff_json))
+
+matches = [u for u in d["units"] if u["name"] == unit]
+if not matches:
+    # Be forgiving about a partial name, but say so explicitly rather than guessing.
+    partial = [u for u in d["units"] if unit.lower() in u["name"].lower()]
+    print(f"resolve-unit: no unit named {unit!r}", file=sys.stderr)
+    if len(partial) == 1:
+        print(f"did you mean {partial[0]['name']!r}?", file=sys.stderr)
+        raise SystemExit(1)
+    if partial:
+        print(f"{len(partial)} partial matches:", file=sys.stderr)
+        for u in partial[:20]:
+            print(f"  {u['name']}", file=sys.stderr)
+        raise SystemExit(1)
+    raise SystemExit(1)
+if len(matches) > 1:
+    print(f"resolve-unit: {unit!r} is ambiguous", file=sys.stderr)
+    raise SystemExit(1)
+
+u = matches[0]
+base = u.get("base_path")
+target = u.get("target_path")
+src = (u.get("metadata") or {}).get("source_path")
+ctx = (u.get("scratch") or {}).get("ctx_path")
+
+if what == "json":
+    print(json.dumps(u, indent=2))
+elif what == "base_path":
+    print(base or "")
+elif what == "base":
+    print(os.path.join(root, base) if base else "")
+elif what == "target_path":
+    print(target or "")
+elif what == "target":
+    print(os.path.join(root, target) if target else "")
+elif what == "source":
+    print(src or "")
+elif what == "ctx":
+    print(ctx or "")
+elif what == "command":
+    if not base:
+        print(f"resolve-unit: {unit!r} is a dsd gap stub with no base_path, so it "
+              f"cannot be built or matched", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"{limited_build} zig build single -DRelease={release} -- {base}")
+elif what == "flags":
+    print((u.get("scratch") or {}).get("c_flags", ""))
+else:
+    print(f"resolve-unit: unknown field {what!r}. Use one of: "
+          f"base_path, base, target_path, target, source, ctx, command, flags, json",
+          file=sys.stderr)
+    raise SystemExit(2)
+PY
+rc=$?
+[ -n "$rc" ] && exit "$rc"
+exit 0

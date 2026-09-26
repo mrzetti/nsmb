@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# objdiff-mcp - start the experimental objdiff MCP server under the local CPU
+# policy, and pass stdio straight through to OpenCode.
+#
+# Why a wrapper instead of calling objdiff-cli directly?
+#
+# The objdiff MCP `build` tool runs the project's objdiff build command, which
+# for NSMB is `zig build single <release> -- <unit>`, which spawns wine, which
+# spawns mwccarm. If the MCP server is started without limits, an agent calling
+# `build` can consume every core on this shared server with no way for the
+# limits to apply to the children.
+#
+# By moving the *server process itself* into a cgroup v2 CPU-quota cgroup
+# before it accepts any request, every descendant it ever spawns inherits the
+# same cap through ordinary cgroup inheritance. That single containment point
+# covers zig, wine, wineserver, and mwccarm, including builds the MCP server
+# starts on its own. It also means the build command baked into objdiff.json
+# does not need to be rewritten, and upstream build.zig is left untouched.
+#
+# Transport is stdio. Nothing is exposed over the network; there is no bind
+# address and no listening socket.
+#
+# Usage:
+#   objdiff-mcp [--project DIR] [extra objdiff-cli args...]
+
+set -euo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+# Default to the repository this script lives in.
+project_dir="$NSMB_ROOT"
+extra=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --project)
+      project_dir="${2:?--project needs a directory}"
+      shift 2
+      ;;
+    *)
+      extra+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [ ! -x "$OBJDIFF_MCP" ]; then
+  echo "objdiff-mcp: experimental objdiff binary not found at $OBJDIFF_MCP" >&2
+  echo "objdiff-mcp: build it with .opencode/bin/build-objdiff-mcp" >&2
+  exit 127
+fi
+
+# ---------------------------------------------------------------------------
+# Persistent cgroup for the whole server lifetime.
+#
+# Deliberately NOT cleaned up on exit: the cgroup is reused across sessions, it
+# is empty between runs, and a long-lived name means the server's builds and a
+# concurrent direct `limited-build` share one cap instead of each getting their
+# own budget (which would multiply total usage).
+# ---------------------------------------------------------------------------
+CG=""
+if [ "$DECOMP_ENFORCE" = "cgroup" ] && [ -n "$CGROUP_BASE" ]; then
+  CG="$CGROUP_BASE/decomp-ai-mcp"
+  if mkdir -p "$CG" 2>/dev/null; then
+    printf '%s\n' "$DECOMP_CPU_MAX" >"$CG/cpu.max" 2>/dev/null \
+      || echo "objdiff-mcp: warning: could not set cpu.max on $CG" >&2
+  else
+    CG=""
+    echo "objdiff-mcp: warning: cgroup containment unavailable; builds run uncapped" >&2
+  fi
+fi
+
+renice_cmd=()
+[ "$DECOMP_NICE" -gt 0 ] && renice_cmd=("nice" "-n" "$DECOMP_NICE")
+
+# Record the live policy so build-info and /nsmb-status can show what the
+# running server is actually enforcing rather than what was configured.
+if [ -d "$NSMB_ROOT/.decomp-ai/state" ]; then
+  cat >"$NSMB_ROOT/.decomp-ai/state/mcp-policy.json" 2>/dev/null <<EOF || true
+{
+  "pid": $$,
+  "started_from": "$NSMB_ROOT",
+  "project": "$project_dir",
+  "enforce": "$DECOMP_ENFORCE",
+  "build_jobs": $DECOMP_BUILD_JOBS,
+  "cpu_cores": $DECOMP_CPU_CORES,
+  "cpu_quota": "$DECOMP_CPU_QUOTA",
+  "cpu_max": "$DECOMP_CPU_MAX",
+  "nice": $DECOMP_NICE,
+  "cgroup": "${CG:-}"
+}
+EOF
+fi
+
+# Diagnostics must go to stderr: stdout is the MCP stdio channel.
+{
+  echo "objdiff-mcp: binary   = $OBJDIFF_MCP"
+  echo "objdiff-mcp: project  = $project_dir"
+  echo "objdiff-mcp: enforce  = $DECOMP_ENFORCE"
+  echo "objdiff-mcp: jobs     = $DECOMP_BUILD_JOBS"
+  echo "objdiff-mcp: quota    = $DECOMP_CPU_QUOTA (cpu.max $DECOMP_CPU_MAX)"
+  echo "objdiff-mcp: cgroup   = ${CG:-<none>}"
+} >&2
+
+if [ -n "$CG" ]; then
+  # Join the cgroup, then replace this shell with the server. Join-before-exec
+  # matters: every process the server later creates inherits the cgroup.
+  exec /bin/bash -c '
+    set -euo pipefail
+    cg="$1"; shift
+    if ! echo $$ >"$cg/cgroup.procs" 2>/dev/null; then
+      echo "objdiff-mcp: warning: could not join cgroup $cg" >&2
+    fi
+    exec "$@"
+  ' _ "$CG" ${renice_cmd+"${renice_cmd[@]}"} "$OBJDIFF_MCP" mcp --transport stdio --project "$project_dir" ${extra+"${extra[@]}"}
+else
+  exec ${renice_cmd+"${renice_cmd[@]}"} "$OBJDIFF_MCP" mcp --transport stdio --project "$project_dir" ${extra+"${extra[@]}"}
+fi

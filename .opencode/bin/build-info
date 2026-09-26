@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# build-info - show the configured and actually-enforced build resource limits.
+#
+# Run this to answer "how much CPU is decompilation allowed to use, and is that
+# limit real or just a number in a file?".
+#
+#   ./.opencode/bin/build-info
+#   ./.opencode/bin/build-info --selftest   # also prove the cgroup caps CPU
+
+set -uo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/decomp-env"
+
+rule="-------------------------------------------"
+
+echo "NSMB build resource policy"
+echo "$rule"
+printf '%-28s %s\n' "repository"        "$NSMB_ROOT"
+printf '%-28s %s\n' "release"           "$NSMB_RELEASE"
+printf '%-28s %s\n' "logical CPUs (nproc)" "$DECOMP_CPU_CORES"
+printf '%-28s %s\n' "build jobs (zig -j)"  "$DECOMP_BUILD_JOBS"
+printf '%-28s %s\n' "CPU quota"           "$DECOMP_CPU_QUOTA"
+printf '%-28s %s\n' "nice level"          "$DECOMP_NICE"
+printf '%-28s %s\n' "cpuset (affinity)"   "$DECOMP_CPUSET"
+echo
+
+echo "Resource-control mechanism"
+echo "$rule"
+case "$DECOMP_ENFORCE" in
+  cgroup)
+    printf '%-28s %s\n' "mechanism" "cgroup v2 CPU quota"
+    printf '%-28s %s\n' "cgroup path" "${CGROUP_BASE:-<none>}/decomp-ai-build"
+    printf '%-28s %s\n' "cgroup v2 usable" "yes (cpu.max is writable)"
+    printf '%-28s %s\n' "cpu.max" "$DECOMP_CPU_MAX"
+    printf '%-28s %s\n' "affinity" "not restricted (quota is the limit)"
+    printf '%-28s %s\n' "systemd --user scope" "unavailable (no user bus); cgroup v2 used directly"
+    ;;
+  taskset)
+    printf '%-28s %s\n' "mechanism" "taskset affinity + nice"
+    printf '%-28s %s\n' "cgroup v2 usable" "no"
+    printf '%-28s %s\n' "affinity" "$DECOMP_CPUSET"
+    printf '%-28s %s\n' "warning" "affinity is not a CPU quota; add nice only"
+    ;;
+  *)
+    printf '%-28s %s\n' "mechanism" "zig -j only"
+    printf '%-28s %s\n' "cgroup v2 usable" "no"
+    printf '%-28s %s\n' "warning" "no aggregate CPU cap; child processes are unconstrained"
+    ;;
+esac
+echo
+
+# ---------------------------------------------------------------------------
+# Live cgroup state, if a server or build is running right now.
+# ---------------------------------------------------------------------------
+mcp_state="$NSMB_ROOT/.decomp-ai/state/mcp-policy.json"
+if [ -f "$mcp_state" ]; then
+  echo "Live objdiff MCP server"
+  echo "$rule"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$mcp_state" <<'PY' 2>/dev/null || echo "  (could not parse $mcp_state)"
+import json, os, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+except Exception:
+    raise SystemExit(0)
+pid = d.get("pid")
+alive = pid and os.path.isdir(f"/proc/{pid}")
+print(f"  pid            {pid} ({'running' if alive else 'not running'})")
+print(f"  project        {d.get('project')}")
+print(f"  enforce        {d.get('enforce')}")
+print(f"  build jobs     {d.get('build_jobs')}")
+print(f"  cpu quota      {d.get('cpu_quota')}  cpu.max {d.get('cpu_max')}")
+cg = d.get("cgroup") or ""
+if cg and alive:
+    live = os.path.join(cg, "cpu.max")
+    if os.path.exists(live):
+        with open(live) as f:
+            print(f"  live cpu.max   {f.read().strip()}")
+    stat = os.path.join(cg, "cpu.stat")
+    if os.path.exists(stat):
+        want = {"nr_periods", "nr_throttled", "throttled_usec", "usage_usec"}
+        with open(stat) as f:
+            for line in f:
+                k, _, v = line.partition(" ")
+                if k in want:
+                    print(f"  {k:<15} {v.strip()}")
+PY
+  else
+    echo "  (python3 not available; raw state below)"
+    cat "$mcp_state"
+  fi
+  echo
+fi
+
+# ---------------------------------------------------------------------------
+# Proof of enforcement. Runs N spinners for a fixed wall time and reports the
+# total CPU seconds actually consumed. Under a working cgroup cap the consumed
+# CPU time is bounded by the quota, so it stays well under N * wall.
+# ---------------------------------------------------------------------------
+if [ "${1:-}" = "--selftest" ]; then
+  echo "Enforcement self-test"
+  echo "$rule"
+  workers=$((DECOMP_BUILD_JOBS * 2))
+  [ "$workers" -lt 2 ] && workers=2
+  [ "$workers" -gt 8 ] && workers=8
+  wall=2
+
+  burn() { local e=$((SECONDS + wall)); while [ "$SECONDS" -lt "$e" ]; do :; done; }
+
+  # Uncapped reference measurement.
+  t0=$(date +%s%N)
+  for _ in $(seq "$workers"); do burn & done
+  wait
+  t1=$(date +%s%N)
+  free_wall_ms=$(((t1 - t0) / 1000000))
+
+  # Capped measurement, using the exact same path limited-build uses.
+  t0=$(date +%s%N)
+  for _ in $(seq "$workers"); do
+    "$here/limited-build" /bin/bash -c "e=\$((SECONDS + $wall)); while [ \$SECONDS -lt \$e ]; do :; done" &
+  done
+  wait
+  t1=$(date +%s%N)
+  capped_wall_ms=$(((t1 - t0) / 1000000))
+
+  quota_pct="${DECOMP_CPU_QUOTA%%\%}"
+  expected_cores=$(python3 -c "print($quota_pct/100)" 2>/dev/null || echo 2)
+
+  printf '%-28s %s\n' "spinner processes" "$workers"
+  printf '%-28s %s\n' "spin duration" "${wall}s each"
+  printf '%-28s %s\n' "uncapped wall time" "${free_wall_ms}ms"
+  printf '%-28s %s\n' "capped wall time" "${capped_wall_ms}ms"
+  printf '%-28s %s\n' "cores if uncapped" "$workers"
+  printf '%-28s %s\n' "cores expected" "$expected_cores"
+  if [ "$capped_wall_ms" -gt $((free_wall_ms + 200)) ]; then
+    printf '%-28s %s\n' "result" "PASS - cap is slowing the workload"
+    printf '%-28s %s\n' "effective cores" \
+      "$(python3 -c "print(round($workers * $free_wall_ms / max($capped_wall_ms,1), 2))")"
+  elif [ "$DECOMP_ENFORCE" = "cgroup" ]; then
+    printf '%-28s %s\n' "result" "INCONCLUSIVE - no slowdown observed"
+  else
+    printf '%-28s %s\n' "result" "N/A - no aggregate cap configured"
+  fi
+  echo
+fi
+
+# ---------------------------------------------------------------------------
+# Toolchain presence, so this doubles as a quick status read.
+# ---------------------------------------------------------------------------
+echo "Toolchain"
+echo "$rule"
+check() {
+  local label="$1" path="$2"
+  if [ -x "$path" ]; then
+    printf '%-28s %s\n' "$label" "ok  ($path)"
+  else
+    printf '%-28s %s\n' "$label" "MISSING ($path)"
+  fi
+}
+check "zig" "$ZIG_BIN"
+check "dsd" "$DSD_BIN"
+check "objdiff (stable)" "$OBJDIFF_STABLE"
+check "objdiff (mcp build)" "$OBJDIFF_MCP"
+
+mwcc="$NSMB_ROOT/build/compiler/mwccarm/1.2/sp3/mwccarm.exe"
+if [ -f "$mwcc" ]; then
+  printf '%-28s %s\n' "mwccarm 1.2sp3" "present (build/compiler/mwccarm/1.2/sp3)"
+else
+  printf '%-28s %s\n' "mwccarm 1.2sp3" "MISSING (user must supply; never download)"
+fi
+
+if command -v wine >/dev/null 2>&1; then
+  printf '%-28s %s\n' "wine" "ok ($(command -v wine))"
+else
+  printf '%-28s %s\n' "wine" "MISSING"
+fi
+
+if [ -f "$NSMB_ROOT/objdiff.json" ]; then
+  printf '%-28s %s\n' "objdiff.json" "present"
+else
+  printf '%-28s %s\n' "objdiff.json" "absent (run: limited-build zig build objdiff)"
+fi

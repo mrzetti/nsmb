@@ -16,3 +16,13 @@ build/*
 
 # Keep .gitkeep files
 !/**/.gitkeep
+
+# --- AI-assisted matching local state (append-only, no upstream rules removed) ---
+# Local toolchain installs: zig, dsd, objdiff (stable + objdiff-mcp PR #400 build),
+# rust build workspace. Never commit these; they are large binaries.
+.tools/
+# Working state for the NSMB OpenCode matching agents: state.json, logs, best-source
+# snapshots, and local Ghidra/objdiff scratch. Not upstream project content.
+.decomp-ai/
+# Local CPU-limit cgroup scratch (empty placeholder so the dir is never tracked)
+.opencode/bin/.decomp-cgroup
