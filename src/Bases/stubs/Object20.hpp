@@ -2,11 +2,32 @@
 #include "../StageEntity.hpp"
 #include "../../AAA.hpp"
 
+// Call descriptor used by Object20's event pointer at 0x3F4
+struct Object20Event {
+	u32 _0;
+	s32 _4;
+};
+
 // MainProfileTable slot 20  |  ov054  |  profile @ 0x02170820
 class Object20 : public StageEntity {
 public:
 	void* _14;
-	u8 _pad0[0x24];
+	u64 _3f8;
+	u32 _400;
+	u32 _404;
+	u32 _408;
+	u16 _40c;
+	u16 _40e;
+	u16 _410;
+	u8 _412;
+	u8 _413;
+	u8 _414;
+	u8 _415;
+	u8 _416;
+	u8 _417;
+	u8 _418;
+	u8 _419;
+	s8 _41a;
 	static void *create();
 	inline Object20() {};
 	inline ~Object20() {};
