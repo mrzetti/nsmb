@@ -32,6 +32,7 @@ public:
 	virtual void pendingDestroy();
 	virtual s32 onDestroy();
 	virtual bool onHeapCreated();
+	virtual s32 onRender();
 };
 
 extern ActorProfile Object232_Profile;
