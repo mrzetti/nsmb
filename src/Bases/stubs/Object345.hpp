@@ -15,7 +15,27 @@ struct Object345_Sensor {
 struct Object345_Pair {
 	Vec2_32 a;
 	Vec2_32 b;
-	u8 _pad[8];
+	s32 _18;
+	u8 _1c;
+	u8 _1d[3];
+};
+
+// 56-byte constant table copied to the stack by onRender
+struct Object345_Tbl {
+	s32 v[14];
+};
+
+// Stand-in for the global object at data_0208b614: only its vtable shape matters here,
+// slots 0..6 are dispatched by preUpdate() (and by MGScene::preUpdate()).
+class Object345_Net {
+      public:
+	virtual void _0() {};
+	virtual void _1() {};
+	virtual void _2() {};
+	virtual void _3() {};
+	virtual void _4(u32, u32) {};
+	virtual bool _5() { return true; };
+	virtual void _6() {};
 };
 
 // MainProfileTable slot 345  |  ov128  |  profile @ 0x020feb50
@@ -23,11 +43,16 @@ class Object345 : public MGScene {
 public:
 	u8 _5c[0x8];
 	u32 _64;
-	u8 _68[0x30];
+	u32 _68;
+	u8 _6c[0x10];
+	s32 _7c;
+	u8 _80[0x18];
 	u32 _98;
-	u8 _9c[0xc];
-	u32 *_a8;
-	u8 _ac[0x6];
+	u32 _9c;
+	u8 _a0[0x8];
+	u32 _a8;
+	u8 _ac[0x4];
+	u16 _b0;
 	u8 _b2;
 	u8 _b3;
 	Object345_Sensor _b4;
@@ -51,7 +76,11 @@ public:
 	u32 _2508;
 	u8 _250c[0x14];
 	Vec2_32 _2520[4];
-	u8 _2550[0x58];
+	u8 _2550[0x50];
+	s32 _25a0;
+	u8 _25a4;
+	u8 _25a5;
+	u8 _25a6[0x2];
 	Vec2_32 _25a8;
 	Vec2_32 _25b4;
 	Vec2_32 _25c0;
@@ -60,13 +89,27 @@ public:
 	u8 _25e4[0xc];
 	u32 *_25f0;
 	u32 *_25f4;
-	u8 _25f8[0x10];
+	s32 _25f8[4];
 	Vec2_32 _2608[4];
 	Vec2_32 _2638[4];
-	u8 _2668[4];
+	s32 _2668;
 	Object345_Pair _266c[0x80];
-	u8 _366c[0x80];
-	u32 *_36ec;
+	u8 _366c[0xc];
+	s32 _3678;
+	u8 _367c[0x24];
+	s32 _36a0[4];
+	s32 _36b0[4];
+	u8 _36c0[4];
+	s32 _36c4;
+	s32 _36c8;
+	u8 _36cc[0x8];
+	s32 _36d4;
+	u8 _36d8[0x8];
+	u8 _36e0;
+	u8 _36e1[0x3];
+	s32 _36e4;
+	u8 _36e8[0x4];
+	u32 _36ec;
 	u8 _36f0[0x10];
 
 	static void *create();
@@ -115,3 +158,4 @@ public:
 NTR_SIZE_GUARD(Object345, 0x3700);
 
 extern ObjectProfile Object345_Profile;
+extern Object345_Net *data_0208b614;
