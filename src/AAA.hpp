@@ -290,6 +290,8 @@ struct Save {
 NTR_SIZE_GUARD(Save, 0x350);
 extern Save save;
 
+bool Wifi_isMinigames();
+
 extern "C" {
 
 	//
@@ -375,7 +377,6 @@ extern "C" {
 	bool(func_0200ae9c)(Vec3_32 *);
 	bool(func_0201f000)(Vec3_32 *);
 	bool isMultiBootCart();
-	bool func_020109c8();
 	void InitGame();
 	void SetMasterGameMode(u32);
 	void SetBootScene(u32);

@@ -5,7 +5,7 @@ extern "C" void NitroMain() {
 	u32 bootScene;
 
 	if (Nitro::Wifi_isMultiBootCart()) {
-		if ((func_020109c8() != 0)) {
+		if ((Wifi_isMinigames() != 0)) {
 			bootTarget = 0;
 		} else {
 			bootTarget = 1;
