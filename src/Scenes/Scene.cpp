@@ -1,18 +1,18 @@
 #include "Scene.hpp"
+#include "../system/app.hpp"
 
-void func_02008558();
-bool func_02046c5c();
-bool Wifi_isMultiBootCart();
-void func_0200f3d8();
-void func_02009b64();
-void func_ov052_02152bf0();
-void func_0200e874(u32, u32, bool);
-void func_0200514c(u32);
-void sceneBaseInit();
-void func_02018ac0();
-void func_0200e944(u32, u32, u32);
-u32 data_02088f18();
-u32 func_02013050(u32);
+extern "C" {
+	void func_02008558();
+	bool func_02046c5c();
+	void func_0200f3d8();
+	void func_ov052_02152bf0();
+	void func_0200e874(u32, u32, bool);
+	void sceneBaseInit();
+	void func_02018ac0();
+	void func_0200e944(u32, u32, u32);
+	u32 data_02088f18();
+	u32 func_02013050(u32);
+}
 u32 data_02085a84;
 u32 data_0208ae58;
 u32 data_02089504;
@@ -45,12 +45,12 @@ Scene::~Scene()
 		}
 		if (a) {
 			bool c = func_02046c5c();
-			if (c != 0 && !Wifi_isMultiBootCart()) {
+			if (c != 0 && !Nitro::Wifi_isMultiBootCart()) {
 				data_02085ad4[0] = save.options.controlOptions; // TODO: Do not offset using pointers
 			}
 			func_0200f3d8();
 		}
-		func_02009b64();
+		FS::Cache::clear();
 		if ((BOOL(data_02085a84 != 0) && (data_0208ae58 != 0)) == TRUE) {
 			func_ov052_02152bf0();
 			data_0208ae58 = 0;
@@ -182,7 +182,7 @@ void Scene::prepareFirstScene()
 		// GlobalFader = Fader();
 		//*(i32*)(&GlobalFader) = 1;
 	}
-	if (Wifi_isMultiBootCart()) {
+	if (Nitro::Wifi_isMultiBootCart()) {
 		data_0203bd30 = 1;
 	} else {
 		u32 boot_scene = Game::getBootScene();
@@ -225,7 +225,7 @@ Scene *Scene::tryChangeScene()
 	}
 #if !defined(VER_Y7QJ)
 	if (data_0203bd30 == 0x146) {
-		func_0200514c(0x10101);
+		App::reset(0x10101);
 	}
 #endif
 	Scene *result = (Scene *)Object::spawnScene(data_0203bd30, data_02088f38, 1);
