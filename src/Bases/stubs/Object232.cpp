@@ -4,6 +4,11 @@ extern "C" void func_ov054_02160654();
 extern "C" bool func_ov054_02160624(void *);
 extern "C" void func_0201c01c(void *);
 extern "C" void func_ov054_0215fed0(void *, Vec3_32 *);
+extern "C" void func_0201b6d4(void *, void *, void *, void *, void *, void *);
+extern "C" void func_0201c080(void *);
+extern "C" void func_0201bd60(void *, void *, i32, i32, i32, i32, i32, i32, i32, i32);
+extern "C" void func_ov054_02160118(void *);
+extern "C" void func_0201dbcc(void *, i32, i32, i32, i32);
 extern u8 data_02085b20[1];
 
 namespace Nitro {
@@ -67,6 +72,81 @@ s32 Object232::onRender()
 	v.y -= 0x2000;
 
 	func_ov054_0215fed0(&_494, &v);
+
+	return true;
+}
+
+// 0x02188514
+s32 Object232::onCreate()
+{
+	if (!prepareResourcesSafe(0x40, Memory_gameHeap))
+		return 0;
+
+	position.z = 0x100000;
+	scale.set(0x1000, 0x1000, 0x1000);
+
+	_7ac = ((settings >> 28) & 0xFF) << 15;
+	if (_7ac == 0)
+		_7ac = 0x80000;
+
+	s32 dir = ((settings << 4) >> 28) & 0xFF;
+	_77c[0].set(0, 0);
+	_77c[1].set(_7ac, -0x8000);
+	_77c[2].set(_7ac, -0x8000);
+
+	if (dir >= 8)
+		dir -= 0x10;
+	_77c[3].x = _7ac << 1;
+	_77c[3].y = dir << 16;
+
+	{
+		Vec2_32 v0;
+		v0.x = _77c[0].x;
+		v0.y = _77c[0].y;
+		Vec2_32 v1;
+		v1.x = _77c[3].x;
+		v1.y = _77c[3].y;
+		Vec2_32 v2;
+		v2.x = _77c[1].x;
+		v2.y = _77c[1].y;
+		Vec2_32 v3;
+		v3.x = _77c[2].x;
+		v3.y = _77c[2].y;
+
+		func_0201b6d4(&_3f4, this, &v0, &v1, &v2, &v3);
+	}
+	func_0201c080(&_3f4);
+
+	func_0201bd60(&_69c[0], this, _77c[0].x, _77c[0].y, 0x3000, 0x8000, -0x8000, 0, 0, 0);
+	func_0201c080(&_69c[0]);
+
+	func_0201bd60(&_69c[1], this, _77c[3].x, _77c[3].y, 0x3000, 0x8000, -0x8000, 0, 0, 0);
+	func_0201c080(&_69c[1]);
+
+	Vec2_32 rel;
+	func_ov054_02160118(&_494);
+
+	_5c8 = 1;
+
+	_4a4[0].x = _77c[0].x;
+	_4a4[0].y = _77c[0].y;
+
+	rel = func_ov098_02187d20(this, false);
+	_4a4[1].x = rel.x;
+	_4a4[1].y = rel.y;
+
+	rel = func_ov098_02187d20(this, true);
+	_4a4[2].x = rel.x;
+	_4a4[2].y = rel.y;
+
+	_4a4[3].x = _77c[3].x;
+	_4a4[3].y = _77c[3].y;
+
+	func_0201dbcc(&_5cc[0], 0x400, 0x140, _77c[1].y, 0x7FFFFFFF);
+	func_0201dbcc(&_5ec[0], 0x400, 0x140, _77c[2].y, 0x7FFFFFFF);
+
+	_7b0 = 0;
+	collisionType = CT_Collisionless;
 
 	return true;
 }
