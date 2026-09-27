@@ -87,6 +87,8 @@ extern u32 data_ov128_020fe408;
 extern u8 data_ov128_02104844[];
 extern u8 data_ov128_0210484c[];
 extern u8 data_ov128_02104854[];
+extern u32 data_ov128_02104850;
+extern u32 data_ov128_02104880;
 extern u8 data_ov128_020fb2c4[];
 extern Object345_Head data_ov128_020fe44c;
 extern Object345_Head data_ov128_020fe46c;
@@ -112,6 +114,22 @@ extern u32 data_ov128_020fe3f8;
 extern u32 data_ov128_020fe3fc;
 extern u32 data_ov128_020fe41c;
 extern u32 data_ov128_020fe420;
+extern Object345_Head data_ov128_020fe53c;
+extern Object345_Head data_ov128_020fe57c;
+extern Object345_Head data_ov128_020fe3e8;
+extern Object345_Head data_ov128_020fe3ec;
+extern Object345_Head data_ov128_020fe5b4;
+extern Object345_Head data_ov128_020fe59c;
+extern Object345_Head data_ov128_020fe3f4;
+extern Object345_Head data_ov128_020fe3c8;
+extern Object345_Head data_ov128_020fe464;
+extern Object345_Head data_ov128_020fe45c;
+extern Object345_Head data_ov128_020fe43c;
+extern Object345_Head data_ov128_020fe5a4;
+extern Object345_Head data_ov128_020fe410;
+extern Object345_Head data_ov128_020fe400;
+extern Object345_Head data_ov128_020fe3d4;
+extern Object345_Head data_ov128_020fe40c;
 extern u32 data_ov128_020fe5c0;
 extern Object345_Head data_ov128_020fe4fc;
 extern u32 data_ov128_0210487c;
@@ -315,6 +333,10 @@ u32 func_ov128_020b907c(s32, s32, s32, s32);
 void func_ov128_020c1dac(u32 *);
 void func_ov128_020bbacc();
 void func_ov128_020c2e6c(u32 *);
+void func_ov128_020bed14(u8 *);
+void func_ov127_02098c8c(Object345 *, u32);
+void func_ov127_02098ce0();
+void func_ov127_02098da0();
 
 void func_ov128_020bb314()
 {
@@ -1056,10 +1078,155 @@ void func_ov128_020be5b4(Object345_Rec *p)
 	}
 }
 
+void func_ov128_020bca44(Object345_Rec4 *p)
+{
+	p->_1c = 0xB4;
+	func_ov127_0209987c(5, data_ov128_020fe3bc, data_ov128_020fe3e4, (u32)-1, (u32)-1, 0x10);
+	func_ov127_02098d3c(1);
+	p->_8 = data_ov128_020fe53c;
+	p->_10 = data_ov128_020fe57c;
+}
+
+void func_ov128_020bc4d4(Object345_Rec4 *p)
+{
+	p->_1c = 0xB4;
+	u32 v = 3;
+	if (data_ov128_020fe408 != 0x2F) {
+		v = data_ov128_020fe408;
+		data_ov128_020fe408 = 0x2F;
+	}
+	func_ov127_0209987c(v, data_ov128_020fe3e8.a, data_ov128_020fe3ec.a, (u32)-1, (u32)-1, 0x10);
+	func_ov127_02098d3c(3);
+	p->_8 = data_ov128_020fe5b4;
+}
+
+void func_ov128_020bdd10(Object345_Rec4 *p)
+{
+	p->_1c = 0xB4;
+	u32 v = 3;
+	if (data_ov128_020fe408 != 0x2F) {
+		v = data_ov128_020fe408;
+		data_ov128_020fe408 = 0x2F;
+	}
+	func_ov127_0209987c(v, data_ov128_020fe3e8.a, data_ov128_020fe3ec.a, (u32)-1, (u32)-1, 0x10);
+	func_ov127_02098d3c(3);
+	p->_8 = data_ov128_020fe59c;
+}
+
+void func_ov128_020bd654(Object345_Rec4 *p)
+{
+	p->_1c = 0x78;
+	u32 v = 9;
+	if (data_ov128_020fe408 != 0x2F) {
+		v = data_ov128_020fe408;
+		data_ov128_020fe408 = 0x2F;
+	}
+	func_ov127_0209987c(v, data_ov128_020fe3f4.a, data_ov128_020fe3c8.a, (u32)-1, (u32)-1, 0x10);
+	func_ov130_021232a8(0xFB);
+	p->_8 = data_ov128_020fe464;
+}
+
+void func_ov128_020bd8d0(Object345_Rec4 *p)
+{
+	p->_1c = 0x3C;
+	u32 v = 8;
+	if (data_ov128_020fe408 != 0x2F) {
+		v = data_ov128_020fe408;
+		data_ov128_020fe408 = 0x2F;
+	}
+	func_ov127_0209987c(v, data_ov128_020fe420, data_ov128_020fe41c, (u32)-1, (u32)-1, 0x10);
+	func_ov127_02098d3c(2);
+	p->_8 = data_ov128_020fe43c;
+}
+
+void func_ov128_020bce54(Object345_Rec4 *p)
+{
+	if (p->_1c != 0) {
+		return;
+	}
+	func_ov127_0209987c(0, data_ov128_020fe410.a, data_ov128_020fe400.a, (u32)-1, (u32)-1, 0x10);
+	func_ov127_0209987c(1, data_ov128_020fe3d4.a, data_ov128_020fe40c.a, (u32)-1, (u32)-1, 0x10);
+	p->_8 = data_ov128_020fe5a4;
+}
+
+void func_ov128_020bd77c(Object345_Rec4 *p)
+{
+	if (p->_1c != 0) {
+		return;
+	}
+	func_ov127_0209987c(0, data_ov128_020fe410.a, data_ov128_020fe400.a, (u32)-1, (u32)-1, 0x10);
+	func_ov127_0209987c(2, data_ov128_020fe3d4.a, data_ov128_020fe40c.a, (u32)-1, (u32)-1, 0x10);
+	p->_8 = data_ov128_020fe45c;
+}
+
+void func_ov128_020bd088(Object345_Rec4 *p)
+{
+	if (p->_1c != 0) {
+		return;
+	}
+	Object345 *q = data_ov128_02104384[0];
+	if (!q) {
+		return;
+	}
+	if (!(*(bool (**)(u32))(*(u32 **)q + 20))(p->_18)) {
+		return;
+	}
+	func_ov127_020996ac(0x2F);
+	func_ov127_02098c8c(q, p->_18);
+	p->_1c = 0;
+	p->_18 = -1;
+	p->_20 = 0;
+	p->_24 = 0;
+}
+
+void func_ov128_020bd5b8(Object345_Rec4 *p)
+{
+	if (p->_1c > 0x64) {
+		return;
+	}
+	if (p->_1c != 0) {
+		return;
+	}
+	Object345 *q = data_ov128_02104384[0];
+	if (!q) {
+		return;
+	}
+	if (!(*(bool (**)(u32))(*(u32 **)q + 20))(p->_18)) {
+		return;
+	}
+	func_ov127_020996ac(0x2F);
+	func_ov127_02098ce0();
+	func_ov127_02098da0();
+	func_ov127_02098c8c(q, p->_18);
+	p->_1c = 0;
+	p->_18 = -1;
+	p->_20 = 0;
+	p->_24 = 0;
+}
+
+void func_ov128_020bee78(Object345 *p)
+{
+	s32 i = 0;
+	u8 *q = data_ov128_02104894;
+	while (i < 0x14) {
+		func_ov128_020be9a8(q);
+		q += 0x30;
+		i++;
+	}
+	*(u32 *)data_ov128_02104854 = 0;
+	*(u16 *)data_ov128_02104844 = 3;
+	data_ov128_02104850 = (u32)p;
+	if (data_ov128_020fe5c0 != 0) {
+		data_ov128_02104880 = (u32)p;
+		data_ov128_0210487c = 1;
+	}
+	*(u32 *)data_ov128_0210484c = (u32)func_ov128_020bed14;
+}
+
 void func_ov128_020bffb8(u32 *p)
 {
 	u32 *q = (u32 *)((u8 *)p + 0x84);
-	((void (*)(void *))(*(u32 **)*q)[3])((void *)data_ov128_020fb2ec);
+	((void (*)(void *))(*(u32 *)((u8 *)*q + 12)))((void *)data_ov128_020fb2ec);
 }
 
 void func_ov128_020c48e4()
