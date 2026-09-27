@@ -1189,21 +1189,14 @@ extern "C" void func_ov013_021372c0(Object131 *self)
 extern "C" void func_ov013_021374b8(Object131 *self)
 {
 	u32 *flag = (u32 *)data_ov013_0213be6c;
-	s32 *d;
 	Pair *e;
 
 	if ((*flag & 1) == 0) {
-		s32 *a = (s32 *)data_ov013_0213b860;
-		s32 *b = (s32 *)data_ov013_0213b868;
-		s32 *c = (s32 *)data_ov013_0213ba38;
+		Pair *t = (Pair *)data_ov013_0213be8c;
 
-		d = (s32 *)data_ov013_0213be8c;
-		d[0] = a[0];
-		d[1] = a[1];
-		d[2] = b[0];
-		d[3] = b[1];
-		d[4] = c[0];
-		d[5] = c[1];
+		t[0] = *(Pair *)data_ov013_0213b860;
+		t[1] = *(Pair *)data_ov013_0213b868;
+		t[2] = *(Pair *)data_ov013_0213ba38;
 		*flag |= 1;
 	}
 	e = (Pair *)data_ov013_0213be8c + self->sub._68;
@@ -1214,21 +1207,14 @@ extern "C" void func_ov013_021374b8(Object131 *self)
 extern "C" void func_ov013_02137550(Object131 *self, s32 arg)
 {
 	u32 *flag = (u32 *)data_ov013_0213be70;
-	s32 *d;
 	Pair *e;
 
 	if ((*flag & 1) == 0) {
-		s32 *a = (s32 *)data_ov013_0213ba70;
-		s32 *b = (s32 *)data_ov013_0213b848;
-		s32 *c = (s32 *)data_ov013_0213b850;
+		Pair *t = (Pair *)data_ov013_0213be74;
 
-		d = (s32 *)data_ov013_0213be74;
-		d[0] = a[0];
-		d[1] = a[1];
-		d[2] = b[0];
-		d[3] = b[1];
-		d[4] = c[0];
-		d[5] = c[1];
+		t[0] = *(Pair *)data_ov013_0213ba70;
+		t[1] = *(Pair *)data_ov013_0213b848;
+		t[2] = *(Pair *)data_ov013_0213b850;
 		*flag |= 1;
 	}
 	e = (Pair *)data_ov013_0213be74 + self->sub._68;
