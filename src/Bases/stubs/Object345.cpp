@@ -71,9 +71,12 @@ extern u8 data_0208b4c9[];
 extern u32 data_0208b5e8;
 // The 8-byte head that this overlay's record initialisers copy verbatim out of
 // the constant tables above.
-struct Object345_Head {
-	u32 a;
-	u32 b;
+union Object345_Head {
+	struct {
+		u32 a;
+		u32 b;
+	};
+	u64 q;
 };
 
 extern u8 data_0208b5f8;
