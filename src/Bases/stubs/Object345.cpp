@@ -74,7 +74,7 @@ struct Object345_Head {
 };
 
 extern u8 data_0208b5f8;
-extern void *data_ov010_02123200;
+u32 data_ov010_02123200(u32);
 extern void *data_ov128_020fdde8;
 extern Object345 **data_ov128_02104384;
 extern u8 data_ov128_021043a0[];
@@ -130,11 +130,11 @@ extern u32 data_ov128_02104878;
 extern u32 data_ov128_02104884;
 extern u32 data_ov128_02104c64;
 extern u32 data_ov128_02104c90;
-extern u32 data_ov128_02104c94;
+extern s32 data_ov128_02104c94;
 extern u32 data_ov128_02104ca8;
 extern u32 *data_ov128_02104dd4;
 extern u32 data_ov128_02104dd8;
-extern u32 *data_ov128_02104de8;
+extern u32 data_ov128_02104de8[5];
 extern u32 *data_ov128_020fe748;
 extern u32 *data_ov128_020fe728;
 extern Object345_Head data_ov128_020fe594;
@@ -147,6 +147,7 @@ extern Object345_Head data_ov128_020fe678;
 extern Object345_Head data_ov128_020fe710;
 extern u32 data_ov128_020fe718[2];
 extern Object345_Head data_ov128_020fe720;
+extern Object345_Head data_ov128_020fe668;
 extern Object345_Head data_ov128_020fb2e4;
 extern Object345_Head data_ov128_02104cb4;
 extern u32 data_ov130_02139604[0x40];
@@ -513,8 +514,7 @@ void func_ov128_020bb5ec(Object345 *p)
 
 u32 func_ov128_020bb5f8(void *p)
 {
-	((void (*)(u32))data_ov010_02123200)((u32)((u8 *)p + 0x80000));
-	return 0;
+	return data_ov010_02123200((u32)((u8 *)p + 0x80000));
 }
 
 bool func_ov128_020bb844(Object345 *p)
@@ -580,7 +580,7 @@ void func_ov128_020bb91c()
 void func_ov128_020c43cc()
 {
 	u8 *row = data_ov128_02104dfc;
-	for (u32 i = 0; i < 3; i++) {
+	for (s32 i = 0; i < 3; i++) {
 		row[0x340] = i;
 		row += 0x344;
 	}
@@ -686,15 +686,10 @@ u8 *func_ov128_020c218c(Object345 *p)
 	return (u8 *)p;
 }
 
-bool func_ov128_020c1d4c(u32 *p, Object345_Head *q)
+bool func_ov128_020c1d4c(u32 *p)
 {
-	if (p[0x1f] != q->a) {
-		return true;
-	}
-	if (p[0x1f] == 0) {
-		return false;
-	}
-	return true;
+	u32 *q = p + 0x1f;
+	return q[0] == data_ov128_020fe668.a && (q[1] == data_ov128_020fe668.b || q[0] == 0);
 }
 void func_ov128_020bbe98(Object345 *p, u32 a)
 {
@@ -747,13 +742,13 @@ void func_ov128_020bdd98(Object345_Sensor *p)
 	if (p->_18 == -1) {
 		return;
 	}
-	u32 *tbl = (u32 *)((u8 *)p + 0x10);
-	if (tbl[0] == 0) {
+	if (*(u32 *)((u8 *)p + 0x10) == 0) {
 		return;
 	}
-	u32 i = tbl[1];
+	u32 *tbl = (u32 *)((u8 *)p + 0x10);
+	s32 i = tbl[1];
 	u32 *q = (u32 *)((u8 *)p + (i >> 1));
-	((void (*)())(i & 1 ? q[tbl[0]] : tbl[0]))();
+	((void (*)())(i & 1 ? *(u32 *)((u8 *)q + tbl[0]) : tbl[0]))();
 }
 
 void func_ov128_020bddf0(Object345_Sensor *p)
@@ -762,13 +757,13 @@ void func_ov128_020bddf0(Object345_Sensor *p)
 		return;
 	}
 	func_02043464((u8 *)p + 0x1c, 0, 1);
-	u32 *tbl = (u32 *)((u8 *)p + 8);
-	if (tbl[0] == 0) {
+	if (*(u32 *)((u8 *)p + 8) == 0) {
 		return;
 	}
-	u32 i = tbl[1];
+	u32 *tbl = (u32 *)((u8 *)p + 8);
+	s32 i = tbl[1];
 	u32 *q = (u32 *)((u8 *)p + (i >> 1));
-	((void (*)())(i & 1 ? q[tbl[0]] : tbl[0]))();
+	((void (*)())(i & 1 ? *(u32 *)((u8 *)q + tbl[0]) : tbl[0]))();
 }
 
 void func_ov128_020bf4d0()
@@ -995,21 +990,20 @@ bool func_ov128_020c26c8(u32 a, s32 n)
 {
 	data_ov128_02104c94 = n;
 	data_ov128_02104ca8 = a;
-	if (n <= 0) {
-		return true;
+	if (n > 0) {
+		s32 i = 0;
+		u32 off = 0;
+		do {
+			if (!func_ov128_020c1e44(data_ov128_02104ca8 + off)) {
+				return false;
+			}
+			if (i < 5) {
+				data_ov128_02104de8[i] = data_ov128_02104ca8 + off;
+			}
+			i++;
+			off += 0x130;
+		} while (i < data_ov128_02104c94);
 	}
-	s32 i = 0;
-	u32 off = 0;
-	do {
-		if (!func_ov128_020c1e44(data_ov128_02104ca8 + off)) {
-			return false;
-		}
-		if (i < 5) {
-			((u32 *)data_ov128_02104de8)[i] = data_ov128_02104ca8 + off;
-		}
-		i++;
-		off += 0x130;
-	} while (i < data_ov128_02104c94);
 	return true;
 }
 
