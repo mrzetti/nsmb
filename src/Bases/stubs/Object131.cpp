@@ -22,6 +22,16 @@ extern u32 data_ov013_0213b48c[];
 extern u32 data_ov013_0213b51c[];
 extern u32 data_ov013_0213b528[];
 extern u32 data_ov013_0213b534[];
+extern u32 data_ov013_0213b860[];
+extern u32 data_ov013_0213b868[];
+extern u32 data_ov013_0213ba38[];
+extern u32 data_ov013_0213be6c[];
+extern u32 data_ov013_0213be8c[];
+extern u32 data_ov013_0213be70[];
+extern u32 data_ov013_0213be74[];
+extern u32 data_ov013_0213ba70[];
+extern u32 data_ov013_0213b848[];
+extern u32 data_ov013_0213b850[];
 extern u8 data_ov000_020ca298;
 extern u8 data_ov013_0213b620[];
 extern u8 data_ov013_0213b880[];
@@ -32,6 +42,10 @@ extern u8 data_ov000_020ca898;
 
 struct Quad {
 	s32 v[2][2];
+};
+
+struct Pair {
+	s32 a, b;
 };
 
 struct Spawn {
@@ -163,6 +177,15 @@ void func_ov013_02137228(Object131 *);
 bool func_ov013_02137830(Object131 *);
 
 void func_ov010_020f98f4();
+bool func_ov013_02133fc4(Object131 *);
+void func_ov013_021372c0(Object131 *);
+void func_ov013_021374b8(Object131 *);
+void func_ov013_02137550(Object131 *, s32);
+void func_ov013_02137e38(Object131 *, Base *);
+bool func_ov013_0213875c();
+void func_020205ec(Base *);
+s32 func_0200aca0(s32);
+s32 func_0200acc4(s32);
 void func_ov010_020e6964(s32, void *, s32);
 void *func_02022a04(s32);
 void func_ov013_0213a05c();
@@ -1118,6 +1141,135 @@ extern "C" bool func_ov013_021387f4()
 	FS::loadFileEmb(0x576, 0);
 	FS::loadFileToOverlayEmb(0x4d9, 0);
 	FS::loadFileToOverlayEmb(0x4da, 0);
+	return true;
+}
+
+// 0x02133fc4
+extern "C" bool func_ov013_02133fc4(Object131 *self)
+{
+	void (**vt)(void);
+	void *p;
+
+	if (self->sub._60 == 0) {
+		func_ov013_0212ffac(self);
+		self->velocity.x = 0;
+		self->velocity.y = 0;
+		self->velocity.z = 0;
+		self->sub._d1 = 0;
+		self->sub._b5 = 1;
+		self->sub._60++;
+		return true;
+	}
+	if (self->sub._60 == -1) {
+		return true;
+	}
+	p = *(void **)&self->sub._7c;
+	vt = (void (**)(void))p;
+	vt[31]();
+	if (self->blendModel.frameController.finished()) {
+		func_ov013_02137550(self, 1);
+	}
+	return true;
+}
+
+// 0x021372c0
+extern "C" void func_ov013_021372c0(Object131 *self)
+{
+	Vec3_32 v;
+
+	func_020205ec(self);
+	func_ov010_020f982c(3, self->_2be);
+	v.x = func_0200acc4(0);
+	v.y = func_0200aca0(0);
+	v.z = self->position.z;
+	func_02012398(0xd7, &v);
+}
+
+// 0x021374b8
+extern "C" void func_ov013_021374b8(Object131 *self)
+{
+	u32 *flag = (u32 *)data_ov013_0213be6c;
+	s32 *d;
+	Pair *e;
+
+	if ((*flag & 1) == 0) {
+		s32 *a = (s32 *)data_ov013_0213b860;
+		s32 *b = (s32 *)data_ov013_0213b868;
+		s32 *c = (s32 *)data_ov013_0213ba38;
+
+		d = (s32 *)data_ov013_0213be8c;
+		d[0] = a[0];
+		d[1] = a[1];
+		d[2] = b[0];
+		d[3] = b[1];
+		d[4] = c[0];
+		d[5] = c[1];
+		*flag |= 1;
+	}
+	e = (Pair *)data_ov013_0213be8c + self->sub._68;
+	func_ov013_0213775c(self, e->a, e->b, 1);
+}
+
+// 0x02137550
+extern "C" void func_ov013_02137550(Object131 *self, s32 arg)
+{
+	u32 *flag = (u32 *)data_ov013_0213be70;
+	s32 *d;
+	Pair *e;
+
+	if ((*flag & 1) == 0) {
+		s32 *a = (s32 *)data_ov013_0213ba70;
+		s32 *b = (s32 *)data_ov013_0213b848;
+		s32 *c = (s32 *)data_ov013_0213b850;
+
+		d = (s32 *)data_ov013_0213be74;
+		d[0] = a[0];
+		d[1] = a[1];
+		d[2] = b[0];
+		d[3] = b[1];
+		d[4] = c[0];
+		d[5] = c[1];
+		*flag |= 1;
+	}
+	e = (Pair *)data_ov013_0213be74 + self->sub._68;
+	func_ov013_0213775c(self, e->a, e->b, 1);
+}
+
+// 0x02137e38
+extern "C" void func_ov013_02137e38(Object131 *self, Base *b)
+{
+	void (**vt)(Base *, Object131 *, s32, s32, s32);
+	void *p;
+
+	if (self->sub._c6 != 0) {
+		return;
+	}
+	if (self->sub._da != 0) {
+		return;
+	}
+	if (*(s16 *)((u8 *)b + 0x79c) != 0) {
+		return;
+	}
+	if (*(u8 *)((u8 *)b + 0x7c1) == 0) {
+		return;
+	}
+	p = *(void **)b;
+	vt = (void (**)(Base *, Object131 *, s32, s32, s32))p;
+	vt[25](b, self, 0, 0x4000, 0);
+}
+
+// 0x0213875c
+extern "C" bool func_ov013_0213875c()
+{
+	func_ov013_0213a05c();
+	FS::loadFileToOverlayEmb(0x4d9, 0);
+	FS::loadFileEmb(0x4d8, 0);
+	FS::loadFileToOverlayEmb(0x4d2, 0);
+	FS::loadFileToOverlayEmb(0x4d3, 0);
+	FS::loadFileToOverlayEmb(0x4d4, 0);
+	FS::loadFileToOverlayEmb(0x4d5, 0);
+	FS::loadFileToOverlayEmb(0x4d6, 0);
+	FS::loadFileToOverlayEmb(0x4d7, 0);
 	return true;
 }
 
