@@ -15,6 +15,10 @@ struct Quad {
 	s32 v[2][2];
 };
 
+struct Tri {
+	u16 v[3];
+};
+
 struct Slot5 {
 	u32 v[5];
 };
@@ -25,6 +29,21 @@ extern Slot5 data_ov013_0213b63c;
 extern Slot5 data_ov013_0213b858;
 extern u32 data_ov013_0213b8c0[2];
 extern u32 data_ov013_0213b3f4[2];
+extern u8 data_ov013_0213b35c[];
+extern u8 data_ov013_0213b364[];
+extern u8 data_ov013_0213b36c[];
+extern u8 data_ov013_0213b374[];
+extern u8 data_ov013_0213b37c[];
+extern u8 data_ov013_0213b384[];
+extern u8 data_ov013_0213b38c[];
+extern u8 data_ov013_0213b394[];
+extern u8 data_ov013_0213b3a4[];
+extern u8 data_ov013_0213b3ac[];
+extern u8 data_ov013_0213b3bc[];
+extern u8 data_ov013_0213b3c4[];
+extern u8 data_ov013_0213b3cc[];
+extern u8 data_ov013_0213b3d4[];
+extern u8 data_ov013_0213b3ec[];
 
 namespace Nitro
 {
@@ -34,6 +53,21 @@ void Math_func_01ffbcac(void *, void *, void *);
 extern "C" {
 void func_ov013_0212fae0(Object131::Elem *);
 void func_ov013_0212fb14(Object131::Elem *, Model *);
+void func_ov013_0212fe20(Object131 *);
+void func_ov013_0212fe84(Object131 *);
+void func_ov013_0212fee8(Object131 *);
+void func_ov013_0212ff4c(Object131 *);
+void func_ov013_0212ffac(Object131 *);
+void func_ov013_02130054(Object131 *);
+void func_ov013_021300b4(Object131 *);
+void func_ov013_02130114(Object131 *);
+void func_ov013_02130178(Object131 *);
+void func_ov013_021301dc(Object131 *);
+void func_ov013_02130240(Object131 *);
+void func_ov013_021302a0(Object131 *);
+void func_ov013_02130304(Object131 *);
+void func_ov013_021303b0(Object131 *);
+void func_ov013_02130540(Object131 *);
 s32 func_ov013_0212fd78(Object131 *);
 s32 func_ov013_0212fdcc(Object131 *);
 void func_ov013_0213128c(Object131 *);
@@ -394,6 +428,157 @@ extern "C" void func_ov013_02138898(s8 value)
 {
 	data_ov013_0213be60 = value;
 }
+
+// 0x0212fe20
+extern "C" void func_ov013_0212fe20(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3ec;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x40000000, 0x1000, 0x0);
+}
+
+// 0x0212fe84
+extern "C" void func_ov013_0212fe84(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3c4;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x0, 0x40000000, 0x800, 0x22);
+}
+
+// 0x0212fee8
+extern "C" void func_ov013_0212fee8(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3a4;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x40000000, 0x800, 0x0);
+}
+
+// 0x0212ff4c
+extern "C" void func_ov013_0212ff4c(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b384;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x0, 0x40000000, 0x800, 0x0);
+}
+
+// 0x0212ffac
+extern "C" void func_ov013_0212ffac(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b374;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x40000000, 0x800, 0x0);
+}
+
+// 0x02130054
+extern "C" void func_ov013_02130054(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3ac;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x4, 0x0, 0x800, 0x0);
+}
+
+// 0x021300b4
+extern "C" void func_ov013_021300b4(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b364;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x0, 0x800, 0x0);
+}
+
+// 0x02130114
+extern "C" void func_ov013_02130114(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b37c;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x4, 0x40000000, 0x800, 0x0);
+}
+
+// 0x02130178
+extern "C" void func_ov013_02130178(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b36c;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x40000000, 0x800, 0x0);
+}
+
+// 0x021301dc
+extern "C" void func_ov013_021301dc(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b394;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x4, 0x40000000, 0x800, 0x0);
+}
+
+// 0x02130240
+extern "C" void func_ov013_02130240(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b35c;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x4, 0x0, 0x800, 0x0);
+}
+
+// 0x021302a0
+extern "C" void func_ov013_021302a0(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3d4;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x4, 0x40000000, 0x800, 0x0);
+}
+
+// 0x02130304
+extern "C" void func_ov013_02130304(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3bc;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x40000000, 0x800, 0x0);
+}
+
+// 0x021303b0
+extern "C" void func_ov013_021303b0(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b3cc;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0x40000000, 0x800, 0x0);
+}
+
+// 0x02130540
+extern "C" void func_ov013_02130540(Object131 *self)
+{
+	Tri v;
+
+	v = *(Tri *)data_ov013_0213b38c;
+
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0x4, 0x0, 0x800, 0x0);
+}
+
 
 void *Object131::create()
 {
