@@ -16,6 +16,12 @@ extern u8 data_ov013_0213b5b4[];
 extern u8 data_ov013_0213b5b8[];
 extern u8 data_ov013_0213ba9c[];
 extern u32 data_ov000_020ca8c0;
+extern u32 data_02085a7c[];
+extern u32 data_ov000_020cae0c[];
+extern u32 data_ov013_0213b48c[];
+extern u32 data_ov013_0213b51c[];
+extern u32 data_ov013_0213b528[];
+extern u32 data_ov013_0213b534[];
 extern u8 data_ov000_020ca298;
 extern u8 data_ov013_0213b620[];
 extern u8 data_ov013_0213b880[];
@@ -26,6 +32,12 @@ extern u8 data_ov000_020ca898;
 
 struct Quad {
 	s32 v[2][2];
+};
+
+struct Spawn {
+	s32 *p;
+	s32 a;
+	s32 b;
 };
 
 struct Tri {
@@ -151,6 +163,7 @@ void func_ov013_02137228(Object131 *);
 bool func_ov013_02137830(Object131 *);
 
 void func_ov010_020f98f4();
+void func_ov010_020e6964(s32, void *, s32);
 void *func_02022a04(s32);
 void func_ov013_0213a05c();
 bool func_ov013_021376d8(Object131 *);
@@ -977,6 +990,134 @@ extern "C" bool func_ov013_02137830(Object131 *self)
 	func_02011e3c(0x3c);
 	func_ov010_020f98f4();
 	*(u8 *)((u8 *)self + 0x3e6) = 1;
+	return true;
+}
+
+// 0x0212fc40
+extern "C" void func_ov013_0212fc40(Object131::Elem *e, s32 *a, s32 v)
+{
+	s32 r;
+
+	r = Wifi::random();
+	e->_0 = v;
+	r = (r & 0x7fff) * 0x7fff;
+	r = (r >> 15) & 0xf;
+	e->_4.x = 0;
+	e->_4.y = 0;
+	e->_4.z = (r << 12) - 0x8000;
+	e->_10 = 0x300;
+	e->_14.x = a[1];
+	e->_14.y = a[2];
+	e->_14.z = a[3];
+}
+
+// 0x02130718
+extern "C" void func_ov013_02130718(Object131 *self, s32 *a, s8 *b, s32 count)
+{
+	for (s32 i = 0; i < 8; i++) {
+		if (i < count) {
+			func_ov013_0212fc40(&self->elems[i], a, b[i]);
+		} else {
+			func_ov013_0212fc40(&self->elems[i], a, -1);
+		}
+	}
+}
+
+// 0x021327c0
+extern "C" void func_ov013_021327c0(Object131 *self, u32 arg)
+{
+	func_02022134(data_ov013_0213b51c[self->sub._68], arg);
+	func_02022134(data_ov013_0213b528[self->sub._68], arg);
+	func_02022134(data_ov013_0213b534[self->sub._68], arg);
+}
+
+// 0x02132fa0
+extern "C" void func_ov013_02132fa0(Object131 *self)
+{
+	Vec3_32 v;
+
+	v.x = self->position.x;
+	v.y = ((u32 *)data_ov000_020cae0c)[((u32 *)data_02085a7c)[0]];
+	v.z = 0x200000;
+	func_02022134(0x10, (u32)&v);
+	func_02022134(0x11, (u32)&v);
+}
+
+// 0x021350d4
+extern "C" void func_ov013_021350d4(Object131 *self, s32 *a)
+{
+	Spawn s;
+
+	a[1] += 0xc000;
+	a[2] += 0xa000;
+	s.p = &s.b;
+	s.a = 0;
+	s.b = 0x1400;
+	Actor::spawnActor(0x4e, (0xffff0 & (((s16 *)data_ov013_0213b48c)[self->sub._ea] << 4)) | 3 | (self->sub._68 << 28), 0, 0, (s32 *)&s, 0);
+}
+
+// 0x021351c8
+extern "C" void func_ov013_021351c8(Object131 *self, Vec3_32 *a)
+{
+	Spawn s;
+
+	s.p = &s.b;
+	s.a = 0;
+	s.b = 0x1400;
+	Actor::spawnActor(0x4e, 0x1001 | (self->sub._68 << 28), a, 0, (s32 *)&s, 0);
+}
+
+// 0x02135210
+extern "C" void func_ov013_02135210(Object131 *self, Vec3_32 *a)
+{
+	Spawn s;
+
+	s.p = &s.b;
+	s.a = 0;
+	s.b = 0x1000;
+	Actor::spawnActor(0x4e, self->sub._68 << 28, a, 0, (s32 *)&s, 0);
+}
+
+// 0x021352cc
+extern "C" void func_ov013_021352cc(Object131 *self)
+{
+	Vec3_32 v;
+	s32 t[2];
+
+	v.x = self->sub._7c.x;
+	v.y = self->sub._7c.y;
+	v.z = self->sub._7c.z - 0x10000;
+	func_02012398(0x135, &v);
+	t[0] = 0;
+	t[1] = 0;
+	func_ov010_020e6964(4, t, 0);
+}
+
+// 0x02135d0c
+extern "C" s32 func_ov013_02135d0c(Object131 *self)
+{
+	if (self->velocity.x < 0) {
+		if (func_ov013_0212fdcc(self) > self->sub._b8) {
+			return 0;
+		}
+		return 1;
+	}
+	if (self->velocity.x > 0) {
+		if (func_ov013_0212fd78(self) >= self->sub._bc - 0x2000) {
+			return 2;
+		}
+	}
+	return 0;
+}
+
+// 0x021387f4
+extern "C" bool func_ov013_021387f4()
+{
+	func_ov013_0213a05c();
+	FS::loadFileEmb(0x577, 0);
+	FS::loadFileEmb(0x576, 0);
+	FS::loadFileToOverlayEmb(0x4d9, 0);
+	FS::loadFileToOverlayEmb(0x4da, 0);
 	return true;
 }
 
