@@ -292,6 +292,9 @@ struct Object345_Rec {
 // constructor/destructor in this overlay, so dsd named them func_ov128_*.
 // They are written here as extern "C" free functions.
 extern "C" {
+extern char _ZTV7Vec2_32[];
+extern char _ZTV7Vec3_32[];
+extern char _ZTV7Vec3_16[];
 void __cxa_vec_cleanup(void *, s32, s32, void (*)(void *));
 void func_ov128_020bde4c(Object345_Sensor *);
 void func_02022c3c(u8 *);
@@ -726,12 +729,12 @@ void func_ov128_020bffdc(Object345_Rec6 *p)
 
 u8 *func_ov128_020c218c(Object345 *p)
 {
-	Object345_Head v = func_ov127_020a4f78((u8 *)p);
-	*(void **)p = data_ov128_020fe6dc;
-	*(u32 *)((u8 *)p + 0x20) = v.a;
-	*(u32 *)((u8 *)p + 0x30) = v.a;
-	*(u32 *)((u8 *)p + 0x40) = v.a;
-	*(u32 *)((u8 *)p + 0x58) = v.b;
+	(void)func_ov127_020a4f78((u8 *)p);
+	*(void **)((u8 *)p + 0x0) = (void *)&_ZTV7Vec3_32[8];
+	*(void **)((u8 *)p + 0x20) = (void *)&_ZTV7Vec3_16[8];
+	*(void **)((u8 *)p + 0x30) = (void *)&_ZTV7Vec3_16[8];
+	*(void **)((u8 *)p + 0x40) = (void *)&_ZTV7Vec3_16[8];
+	*(void **)((u8 *)p + 0x58) = data_ov128_020fe6dc;
 	func_ov130_021253f8((u8 *)p + 0x84);
 	return (u8 *)p;
 }
@@ -1092,6 +1095,24 @@ void func_ov128_020be5b4(Object345_Rec *p)
 			p->h = data_ov128_020fe5c4;
 		}
 	}
+}
+
+void func_ov128_020bfee8(void *p)
+{
+	*(void **)((u8 *)p + 0x8) = (void *)&_ZTV7Vec2_32[8];
+	*(void **)((u8 *)p + 0x14) = (void *)&_ZTV7Vec2_32[8];
+	*(void **)((u8 *)p + 0x20) = (void *)&_ZTV7Vec2_32[8];
+}
+
+void func_ov128_020c492c(void *p)
+{
+	*(void **)((u8 *)p + 0x8) = (void *)&_ZTV7Vec3_32[8];
+	*(void **)((u8 *)p + 0x18) = (void *)&_ZTV7Vec3_32[8];
+	*(void **)((u8 *)p + 0x28) = (void *)&_ZTV7Vec3_32[8];
+	*(void **)((u8 *)p + 0x38) = (void *)&_ZTV7Vec3_32[8];
+	*(void **)((u8 *)p + 0x48) = (void *)&_ZTV7Vec3_32[8];
+	*(void **)((u8 *)p + 0x58) = (void *)&_ZTV7Vec3_32[8];
+	*(u8 *)((u8 *)p + 0x340) = 0;
 }
 
 void func_ov128_020baeb4(s32 a, u32 n)
