@@ -96,7 +96,7 @@ extern void *data_ov128_020fe6dc;
 extern u32 data_ov128_020fe3b8;
 extern u32 data_ov128_020fe404;
 extern u32 data_ov128_02104c90;
-extern u32 *data_ov128_02100dec;
+extern u32 data_ov128_02100dec[];
 extern u8 data_ov128_021057c8[];
 extern u8 data_ov128_02105afc[];
 extern Object345_Head data_020848dc;
@@ -132,8 +132,10 @@ extern Object345_Head data_ov128_020fe3d4;
 extern Object345_Head data_ov128_020fe40c;
 extern u32 data_ov128_020fe5c0;
 extern u32 data_ov128_02104874;
+extern u32 data_ov128_02104c5c;
+extern Object345_Head data_ov128_020fe640;
 extern u32 *data_ov128_02104c58;
-extern u32 *data_ov128_020fb2a8;
+extern u32 data_ov128_020fb2a8[];
 extern Object345_Head data_ov128_020fe6b8;
 extern Object345_Head data_ov128_020fe454;
 extern Object345_Head data_ov128_020fe48c;
@@ -176,7 +178,7 @@ extern u32 data_ov128_020fe718[2];
 extern Object345_Head data_ov128_020fe720;
 extern Object345_Head data_ov128_020fe668;
 extern u8 data_ov128_020fde88[];
-extern u32 *data_ov128_02104c70;
+extern u32 data_ov128_02104c70;
 extern u8 data_ov128_020fdf28[];
 extern u8 data_ov128_020fb2ec[];
 extern Object345_Head data_ov128_020fb2e4;
@@ -343,6 +345,8 @@ void func_ov128_020bbacc();
 void func_ov128_020c2e6c(u32 *);
 void func_ov128_020bed14(u8 *);
 void func_ov128_020bf87c();
+void func_ov128_020c01bc(u8 *);
+void func_ov128_020bffdc(Object345_Rec6 *);
 void func_ov127_02098c8c(Object345 *, u32);
 void func_ov127_02098ce0();
 void func_ov127_02098da0();
@@ -833,7 +837,7 @@ void func_ov128_020c446c()
 
 void func_ov128_020bae54(Object345 *p)
 {
-	func_ov127_02099ea8(*(u32 *)((u8 *)data_ov128_02100dec + 0x20), 0x20, 0xC, (u32)-1, (u32)-1);
+	func_ov127_02099ea8(data_ov128_02100dec[8], 0x20, 0xC, (u32)-1, (u32)-1);
 	func_ov128_020b8934(0x48, 0xC, (u32)p, 1, 0xA, (u32)-1);
 }
 
@@ -1087,6 +1091,47 @@ void func_ov128_020be5b4(Object345_Rec *p)
 	}
 }
 
+void func_ov128_020baeb4(s32 a, u32 n)
+{
+	s32 t = (s32)data_ov128_020fb2a8[n];
+	func_ov128_020b8934(0xF4, 0xC, (u32)(a >= t ? t : a), (u32)-1, 1, 0xA);
+	func_ov127_02099ea8(data_ov128_02100dec[4], 0xF4 - (0x44 - (6 - n) * 8), 0xC, (u32)-1,
+	                    (u32)-1);
+}
+
+bool func_ov128_020c21d4()
+{
+	s32 n = data_ov128_02104c94;
+	s32 i = 0;
+	u8 *q = (u8 *)data_ov128_02104ca8;
+	while (i < n) {
+		u32 *r = (u32 *)(q + 0x7c);
+		if (r[0] != data_ov128_020fe640.a || (r[1] == data_ov128_020fe640.b && r[0] == 0)) {
+			return false;
+		}
+		q += 0x130;
+		i++;
+	}
+	return true;
+}
+
+void func_ov128_020c225c()
+{
+	data_ov128_02104c70 = -(s32)0x4800;
+	s32 i = 0;
+	if (data_ov128_02104c94 <= 0) {
+		data_ov128_02104c5c = 0x100;
+		return;
+	}
+	u32 off = 0;
+	do {
+		func_ov128_020c01bc((u8 *)data_ov128_02104ca8 + off);
+		func_ov128_020bffdc((Object345_Rec6 *)((u8 *)data_ov128_02104ca8 + off));
+		off += 0x130;
+		i++;
+	} while (i < data_ov128_02104c94);
+}
+
 void func_ov128_020ba2b0(Object345 *p)
 {
 	if (p->_b2 == 0) {
@@ -1102,7 +1147,7 @@ void func_ov128_020ba2b0(Object345 *p)
 			return;
 		}
 	}
-	func_ov127_02099ea8(data_ov128_02100dec[0x10], 0xC0, 0xB0, 0, 0);
+	func_ov127_02099ea8(data_ov128_02100dec[0x10], 0xC0, 0xB0, (u32)-1, (u32)-1);
 }
 
 void func_ov128_020beb10()
