@@ -79,7 +79,7 @@ struct Object345_Head {
 extern u8 data_0208b5f8;
 u32 data_ov010_02123200(u32);
 extern u8 data_ov128_020fdde8[];
-extern Object345 **data_ov128_02104384;
+extern Object345 *data_ov128_02104384[];
 extern u8 data_ov128_021043a0[];
 extern u8 data_ov128_02104894[];
 extern u8 data_ov128_02104dfc[];
@@ -151,10 +151,10 @@ extern Object345_Head data_ov128_020fe710;
 extern u32 data_ov128_020fe718[2];
 extern Object345_Head data_ov128_020fe720;
 extern Object345_Head data_ov128_020fe668;
-extern u32 *data_ov128_020fde88;
+extern u8 data_ov128_020fde88[];
 extern u32 *data_ov128_02104c70;
-extern void *data_ov128_020fdf28;
-extern void *data_ov128_020fb2ec;
+extern u8 data_ov128_020fdf28[];
+extern u8 data_ov128_020fb2ec[];
 extern Object345_Head data_ov128_020fb2e4;
 extern Object345_Head data_ov128_02104cb4;
 extern u32 data_ov130_02139604[0x40];
@@ -409,7 +409,7 @@ void func_ov128_020bafbc(s32 *p, s32 a)
 
 void func_ov128_020baf34(s32 a)
 {
-	Object345 *p = *data_ov128_02104384;
+	Object345 *p = data_ov128_02104384[0];
 	if (p) {
 		func_ov128_020baf94((s32 *)(u8 *)p, a);
 	}
@@ -417,7 +417,7 @@ void func_ov128_020baf34(s32 a)
 
 void func_ov128_020baf64(s32 a)
 {
-	Object345 *p = *data_ov128_02104384;
+	Object345 *p = data_ov128_02104384[0];
 	if (p) {
 		func_ov128_020bafbc((s32 *)(u8 *)p, a);
 	}
@@ -560,7 +560,7 @@ bool func_ov128_020bb8f4(Object345 *p)
 Object345 *func_ov128_020bb31c(Object345 *p)
 {
 	*(void **)p = data_ov128_020fdde8;
-	*data_ov128_02104384 = 0;
+	data_ov128_02104384[0] = 0;
 	func_ov127_02099b00();
 	return p;
 }
@@ -568,14 +568,14 @@ Object345 *func_ov128_020bb31c(Object345 *p)
 Object345 *func_ov128_020bb384(Object345 *p)
 {
 	*(void **)p = data_ov128_020fdde8;
-	*data_ov128_02104384 = 0;
+	data_ov128_02104384[0] = 0;
 	func_ov127_02099b00();
 	return p;
 }
 
 u32 func_ov128_020b96b4()
 {
-	return *data_ov128_02104384 ? data_ov130_02139604[1] : 0;
+	return data_ov128_02104384[0] ? data_ov130_02139604[1] : 0;
 }
 
 void func_ov128_020bbaa8(Object345 *p)
@@ -611,9 +611,9 @@ void func_ov128_020bbb10()
 }
 void func_ov128_020ba26c(u32)
 {
-	if (*data_ov128_02104384) {
-		func_ov128_020bde4c((Object345_Sensor *)((u8 *)*data_ov128_02104384 + 0xb4));
-		*(u32 *)((u8 *)*data_ov128_02104384 + 0x8c) = 0;
+	if (data_ov128_02104384[0]) {
+		func_ov128_020bde4c((Object345_Sensor *)((u8 *)data_ov128_02104384[0] + 0xb4));
+		*(u32 *)((u8 *)data_ov128_02104384[0] + 0x8c) = 0;
 	}
 }
 
@@ -714,7 +714,7 @@ void func_ov128_020bbe98(Object345 *p, u32 a)
 
 void func_ov128_020bc1f8(Object345_Rec7 *p)
 {
-	Object345 *q = *data_ov128_02104384;
+	Object345 *q = data_ov128_02104384[0];
 	if (!q) {
 		return;
 	}
@@ -808,7 +808,7 @@ void func_ov128_020bae54(Object345 *p)
 
 void func_ov128_020bc3c4()
 {
-	if (!*data_ov128_02104384) {
+	if (!data_ov128_02104384[0]) {
 		return;
 	}
 	u32 v = func_ov128_020b952c();
@@ -1059,7 +1059,7 @@ void func_ov128_020be5b4(Object345_Rec *p)
 void func_ov128_020bffb8(u32 *p)
 {
 	u32 *q = (u32 *)((u8 *)p + 0x84);
-	((void (*)(void *))(*(u32 **)*q)[3])(data_ov128_020fb2ec);
+	((void (*)(void *))(*(u32 **)*q)[3])((void *)data_ov128_020fb2ec);
 }
 
 void func_ov128_020c48e4()
@@ -1067,40 +1067,44 @@ void func_ov128_020c48e4()
 	__cxa_vec_cleanup(data_ov128_02104dfc, 4, 0x344, (void (*)(void *))func_ov128_020c4908);
 }
 
-void func_ov128_020bb4d0(Object345 *p)
+Object345 * func_ov128_020bb4d0(Object345 *p)
 {
 	*(void **)p = data_ov128_020fde88;
 	func_02023118((u8 *)p + 0x26b4);
 	func_ov128_020bb31c(p);
+	return p;
 }
 
-void func_ov128_020bbd50(Object345 *p)
+Object345 * func_ov128_020bbd50(Object345 *p)
 {
 	*(void **)p = data_ov128_020fdf28;
 	func_02023118((u8 *)p + 0x25e8);
 	func_ov128_020bb31c(p);
+	return p;
 }
 
-void func_ov128_020bb504(Object345 *p)
+Object345 *func_ov128_020bb504(Object345 *p)
 {
 	*(void **)p = data_ov128_020fde88;
 	func_02023118((u8 *)p + 0x26b4);
 	func_ov128_020bb31c(p);
 	Base::operator delete(p);
+	return p;
 }
 
-void func_ov128_020bbd84(Object345 *p)
+Object345 *func_ov128_020bbd84(Object345 *p)
 {
 	*(void **)p = data_ov128_020fdf28;
 	func_02023118((u8 *)p + 0x25e8);
 	func_ov128_020bb31c(p);
 	Base::operator delete(p);
+	return p;
 }
 
 Object345 *func_ov128_020bb34c(Object345 *p)
 {
 	*(void **)p = data_ov128_020fdde8;
-	*data_ov128_02104384 = 0;
+	data_ov128_02104384[0] = 0;
 	func_ov127_02099b00();
 	Base::operator delete(p);
 	return p;
@@ -1141,12 +1145,14 @@ void func_ov128_020c19e8(u32 *p)
 
 void func_ov128_020c438c()
 {
+	s32 i = 0;
 	u8 *row = data_ov128_02104dfc;
-	for (s32 i = 0; i < 4; i++) {
+	while (i < 4) {
 		if (row[0x340] != 0) {
 			func_ov128_020c2e6c((u32 *)row);
 		}
 		row += 0x344;
+		i++;
 	}
 }
 
@@ -1194,12 +1200,12 @@ void func_ov128_020c68d8(Object345 *)
 
 void func_ov128_020c6918()
 {
-	u32 a = Nitro::func_02061ff8();
+	u32 a = Nitro::func_02061ff8() + 0xc000;
 	u32 b = Nitro::func_02061ff8();
-	Nitro::func_02066e7c(b, a + 0xc000, 0x6000);
-	u32 c = Nitro::func_02061fd8();
+	Nitro::func_02066e7c(b, a, 0x6000);
+	u32 c = Nitro::func_02061fd8() + 0x6000;
 	u32 d = Nitro::func_02061fd8();
-	Nitro::func_02066e7c(d, c + 0x6000, 0x6000);
+	Nitro::func_02066e7c(d, c, 0x6000);
 }
 
 void func_ov128_020c014c(u32 *p)
