@@ -5,10 +5,18 @@
 #include "../../graphics/3d/modelanm.hpp"
 #include "../../graphics/3d/model.hpp"
 #include "../../Collision/activecollider.hpp"
+#include "../../Collision/collisionmgr.hpp"
 
-class CollisionManager {
+namespace FS
+{
+void *loadFileEmb(u32, u32);
+void *loadFileToOverlayEmb(u32, u32);
+}
+
+class CollisionManager : public CollisionMgr
+{
 public:
-	u8 _pad[0xBC];
+	u8 _pad[8];
 
 	CollisionManager();
 	virtual ~CollisionManager();
