@@ -738,58 +738,46 @@ extern "C" void func_ov013_02130f48(Object131 *self)
 extern "C" void func_ov013_02131048(Object131 *self)
 {
 	Mat4x3 mtx;
-	s32 v[3];
 
 	self->blendModel.getNodeMatrix(6, &mtx);
-	v[0] = 0;
-	v[1] = 0;
-	v[2] = 0;
-	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)&self->sub + 0xA0));
+	s32 v[3] = { 0, 0, 0 };
+	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)self + 0xAA0));
 }
 
 // 0x0213108c
 extern "C" void func_ov013_0213108c(Object131 *self)
 {
 	Mat4x3 mtx;
-	s32 v[3];
 
 	self->blendModel.getNodeMatrix(3, &mtx);
-	v[0] = 0;
-	v[1] = 0;
-	v[2] = 0;
-	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)&self->sub + 0x90));
+	s32 v[3] = { 0, 0, 0 };
+	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)self + 0xA90));
 }
 
 // 0x021310d0
 extern "C" void func_ov013_021310d0(Object131 *self)
 {
 	Mat4x3 mtx;
-	s32 v[3];
 
 	self->blendModel.getNodeMatrix(0xa, &mtx);
-	v[0] = 0;
-	v[1] = 0;
-	v[2] = 0;
-	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)&self->sub + 0x80));
+	s32 v[3] = { 0, 0, 0 };
+	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)self + 0xA80));
 }
 
 // 0x02131114
 extern "C" void func_ov013_02131114(Object131 *self)
 {
 	Mat4x3 mtx;
-	s32 v[3];
 
 	self->blendModel.getNodeMatrix(0xf, &mtx);
-	v[0] = 0;
-	v[1] = 0;
-	v[2] = 0;
-	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)&self->sub + 0x70));
+	s32 v[3] = { 0, 0, 0 };
+	Nitro::Math_func_01ffbcac(v, &mtx, (void *)((u8 *)self + 0xA70));
 }
 
 // 0x02131694
 extern "C" void func_ov013_02131694(Object131 *self)
 {
-	self->collisionMgr.func_ov000_020ab010(self, data_ov013_0213b4ec, data_ov013_0213b4d4, data_ov013_0213b4ec, 0);
+	self->collisionMgr.func_ov000_020ab010(self, data_ov013_0213b4d4, data_ov013_0213b4e0, data_ov013_0213b4ec, 0);
 }
 
 // 0x0213772c
