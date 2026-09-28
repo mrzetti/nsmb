@@ -214,6 +214,8 @@ bool func_ov013_02137114(Object131 *, s32);
 void func_ov013_02135e0c(Object131 *);
 void func_ov013_02130414(Object131 *);
 bool func_ov013_02133f00(Object131 *);
+void func_ov013_02137914(Object131 *, PlayerBase *);
+void func_ov013_02130e58(Object131 *);
 }
 
 // 0x0212fae0
@@ -1381,6 +1383,50 @@ extern "C" bool func_ov013_02133f00(Object131 *self)
 		}
 	}
 	return true;
+}
+
+// 0x02137914
+extern "C" void func_ov013_02137914(Object131 *self, PlayerBase *p)
+{
+	s32 d = *(s32 *)((u8 *)p + 0xd0);
+	s32 v;
+
+	if (d > 0) {
+		self->sub._d0 = 1;
+		*(s32 *)((u8 *)p + 0xb4) = -0x2b00;
+		v = 0x6000;
+	} else if (d < 0) {
+		self->sub._d0 = 0;
+		*(s32 *)((u8 *)p + 0xb4) = 0x2b00;
+		v = 0x6000;
+	} else {
+		if (*(u32 *)((u8 *)p + 0x60) > *(u32 *)((u8 *)self + 0x60)) {
+			self->sub._d0 = 0;
+			*(s32 *)((u8 *)p + 0xb4) = 0x1b00;
+		} else {
+			self->sub._d0 = 1;
+			*(s32 *)((u8 *)p + 0xb4) = -0x1b00;
+		}
+		v = 0x3000;
+	}
+	p->func_ov011_0212beb8(v, 0, 1, 1, 0);
+}
+
+// 0x02130e58
+extern "C" void func_ov013_02130e58(Object131 *self)
+{
+	PlayerBase *p = (PlayerBase *)Game::getPlayer(0);
+	Vec3_32 v1 = p->func_ov011_0212bbdc();
+	Vec3_32 v2;
+
+	v2.x = *(s32 *)((u8 *)p + 0x574);
+	v2.y = *(s32 *)((u8 *)p + 0x578);
+	v2.z = *(s32 *)((u8 *)p + 0x57c);
+	if (v1.y - 0x10000 < *(s32 *)((u8 *)self + 0xa74)) {
+		func_020433f8(&self->sub._d2, 0, 0x400);
+	} else {
+		func_020433f8(&self->sub._d2, -0x2000, 0x400);
+	}
 }
 
 void *Object132::create()

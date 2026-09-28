@@ -6,6 +6,7 @@
 #include "../../graphics/3d/model.hpp"
 #include "../../Collision/activecollider.hpp"
 #include "../../Collision/collisionmgr.hpp"
+#include "../Player/PlayerBase.hpp"
 
 namespace FS
 {
