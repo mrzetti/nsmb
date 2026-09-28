@@ -35,6 +35,7 @@ extern u32 data_ov013_0213b850[];
 extern u8 data_ov000_020ca298;
 extern u8 data_ov013_0213b620[];
 extern u8 data_ov013_0213b424[];
+extern u8 data_0208af3c[];
 extern u32 data_ov013_0213b44c[];
 extern u32 data_ov013_0213b454[];
 extern u32 data_ov013_0213b464[];
@@ -77,6 +78,7 @@ extern Pair data_ov013_0213b880;
 extern Pair data_ov013_0213ba10;
 extern Pair data_ov013_0213b9f0;
 extern Pair data_ov013_0213b8b8;
+extern Pair data_ov013_0213b9b8;
 extern Quad data_ov013_0213b54c;
 extern Quad data_ov013_0213b55c;
 extern Slot5 data_ov013_0213b63c;
@@ -216,6 +218,7 @@ void func_ov013_02130414(Object131 *);
 bool func_ov013_02133f00(Object131 *);
 void func_ov013_02137914(Object131 *, PlayerBase *);
 void func_ov013_02130e58(Object131 *);
+bool func_ov013_02136aac(Object131 *);
 }
 
 // 0x0212fae0
@@ -1428,6 +1431,26 @@ extern "C" void func_ov013_02130e58(Object131 *self)
 	} else {
 		func_020433f8(&self->sub._d2, 0, 0x400);
 	}
+}
+
+// 0x02136aac
+extern "C" bool func_ov013_02136aac(Object131 *self)
+{
+	if (self->sub._60 == 0) {
+		*(s32 *)((u8 *)self + 0xd0) = 0;
+		*(s32 *)((u8 *)self + 0xd4) = 0;
+		*(s32 *)((u8 *)self + 0xd8) = 0;
+		self->sub._d1 = 0;
+		self->sub._60++;
+	} else if (self->sub._60 != -1) {
+		s32 n = *(u8 *)((u8 *)self + 0x33c) - 1;
+
+		if (*(u64 *)data_0208af3c & ((u64)1 << n)) {
+			self->sub._64 = 0;
+			func_ov013_0213775c(self, data_ov013_0213b9b8, 1);
+		}
+	}
+	return true;
 }
 
 void *Object132::create()
