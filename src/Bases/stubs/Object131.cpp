@@ -1400,7 +1400,7 @@ extern "C" void func_ov013_02137914(Object131 *self, PlayerBase *p)
 		*(s32 *)((u8 *)p + 0xb4) = 0x2b00;
 		v = 0x6000;
 	} else {
-		if (*(u32 *)((u8 *)p + 0x60) > *(u32 *)((u8 *)self + 0x60)) {
+		if (*(s32 *)((u8 *)p + 0x60) > *(s32 *)((u8 *)self + 0x60)) {
 			self->sub._d0 = 0;
 			*(s32 *)((u8 *)p + 0xb4) = 0x1b00;
 		} else {
@@ -1418,14 +1418,15 @@ extern "C" void func_ov013_02130e58(Object131 *self)
 	PlayerBase *p = (PlayerBase *)Game::getPlayer(0);
 	Vec3_32 v1 = p->func_ov011_0212bbdc();
 	Vec3_32 v2;
+	s32 *q = (s32 *)((u8 *)p + 0x574);
 
-	v2.x = *(s32 *)((u8 *)p + 0x574);
-	v2.y = *(s32 *)((u8 *)p + 0x578);
-	v2.z = *(s32 *)((u8 *)p + 0x57c);
-	if (v1.y - 0x10000 < *(s32 *)((u8 *)self + 0xa74)) {
-		func_020433f8(&self->sub._d2, 0, 0x400);
-	} else {
+	v2.x = q[0];
+	v2.y = q[1];
+	v2.z = q[2];
+	if (v1.y - 0x10000 >= *(s32 *)((u8 *)self + 0xa74)) {
 		func_020433f8(&self->sub._d2, -0x2000, 0x400);
+	} else {
+		func_020433f8(&self->sub._d2, 0, 0x400);
 	}
 }
 
