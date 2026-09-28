@@ -34,14 +34,11 @@ extern u32 data_ov013_0213b848[];
 extern u32 data_ov013_0213b850[];
 extern u8 data_ov000_020ca298;
 extern u8 data_ov013_0213b620[];
-extern u8 data_ov013_0213b880[];
 extern u8 data_ov013_0213b424[];
 extern u32 data_ov013_0213b44c[];
 extern u32 data_ov013_0213b454[];
 extern u32 data_ov013_0213b464[];
 extern u32 data_ov013_0213b45c[];
-extern u32 data_ov013_0213ba10[2];
-extern u32 data_ov013_0213b9f0[2];
 extern u32 data_ov013_0213baa8[];
 extern u8 data_ov000_020ca880;
 extern u8 data_ov000_020ca898;
@@ -75,11 +72,14 @@ struct Slot5 {
 extern Tri3 data_ov013_0213b498;
 extern u8 data_ov013_0213b3b4[];
 extern u8 data_ov013_0213b3e4[];
-extern u32 data_ov013_0213b8b8[2];
+extern Pair data_ov013_0213b858;
+extern Pair data_ov013_0213b880;
+extern Pair data_ov013_0213ba10;
+extern Pair data_ov013_0213b9f0;
+extern Pair data_ov013_0213b8b8;
 extern Quad data_ov013_0213b54c;
 extern Quad data_ov013_0213b55c;
 extern Slot5 data_ov013_0213b63c;
-extern Slot5 data_ov013_0213b858;
 extern u32 data_ov013_0213b8c0[2];
 extern u32 data_ov013_0213b3f4[2];
 extern u8 data_ov013_0213b35c[];
@@ -205,7 +205,7 @@ void *func_02022a04(s32);
 void func_ov013_0213a05c();
 bool func_ov013_021376d8(Object131 *);
 void func_ov013_02137328(Object131 *, s32, s32);
-void func_ov013_0213775c(Object131 *, s32, s32, s32);
+void func_ov013_0213775c(Object131 *, Pair, s32);
 s32 func_ov013_02136d9c(Object131 *);
 void func_ov013_021375e8(Object131 *, s32);
 void func_ov013_02130414(Object131 *);
@@ -345,7 +345,7 @@ extern "C" bool func_ov013_02131d0c(Object131 *self)
 	if (!func_ov013_0213886c()) {
 		return false;
 	}
-	func_ov013_0213775c(self, data_ov013_0213b858.v[0], data_ov013_0213b858.v[1], 1);
+	func_ov013_0213775c(self, data_ov013_0213b858, 1);
 	self->sub._8 = data_ov013_0213b8c0[0];
 	self->sub._c = data_ov013_0213b8c0[1];
 	return true;
@@ -412,7 +412,7 @@ extern "C" bool func_ov013_021376d8(Object131 *self)
 	tab[0] = data_ov013_0213b3f4[0];
 	tab[1] = data_ov013_0213b3f4[1];
 	self->sub._64 = tab[self->sub._62];
-	func_ov013_0213775c(self, data_ov013_0213b880[0], data_ov013_0213b880[1], 1);
+	func_ov013_0213775c(self, data_ov013_0213b880, 1);
 	return true;
 }
 
@@ -1210,7 +1210,7 @@ extern "C" void func_ov013_021374b8(Object131 *self)
 		*flag |= 1;
 	}
 	e = (Pair *)data_ov013_0213be8c + self->sub._68;
-	func_ov013_0213775c(self, e->a, e->b, 1);
+	func_ov013_0213775c(self, *e, 1);
 }
 
 // 0x02137550
@@ -1228,7 +1228,7 @@ extern "C" void func_ov013_02137550(Object131 *self, s32 arg)
 		*flag |= 1;
 	}
 	e = (Pair *)data_ov013_0213be74 + self->sub._68;
-	func_ov013_0213775c(self, e->a, e->b, 1);
+	func_ov013_0213775c(self, *e, 1);
 }
 
 // 0x02137e38
@@ -1300,7 +1300,7 @@ extern "C" bool func_ov013_02136f50(Object131 *self, s32 i)
 	if (!(self->sub._e4 > 0) && cur == data_ov013_0213b454[i]) {
 		func_ov013_021371d0(self);
 		if (func_ov013_02136d9c(self)) {
-			func_ov013_0213775c(self, data_ov013_0213ba10[0], data_ov013_0213ba10[1], 1);
+			func_ov013_0213775c(self, data_ov013_0213ba10, 1);
 			return true;
 		}
 	}
@@ -1320,7 +1320,7 @@ extern "C" bool func_ov013_02137114(Object131 *self, s32 i)
 	if (!(self->sub._e4 > 0) && cur == data_ov013_0213b45c[i]) {
 		func_ov013_021371d0(self);
 		if (func_ov013_02136d9c(self)) {
-			func_ov013_0213775c(self, data_ov013_0213b9f0[0], data_ov013_0213b9f0[1], 1);
+			func_ov013_0213775c(self, data_ov013_0213b9f0, 1);
 			return true;
 		}
 	}
@@ -1372,16 +1372,13 @@ extern "C" bool func_ov013_02133f00(Object131 *self)
 		self->sub._d1 = 0;
 		self->sub._b5 = 1;
 		self->sub._60++;
-		return true;
-	}
-	if (self->sub._60 == -1) {
-		return true;
-	}
-	p = *(void **)((u8 *)self + 0xa00);
-	vt = (void (**)(void))p;
-	vt[31]();
-	if (self->blendModel.frameController.finished()) {
-		func_ov013_0213775c(self, data_ov013_0213b8b8[0], data_ov013_0213b8b8[1], 1);
+	} else if (self->sub._60 != -1) {
+		p = *(void **)((u8 *)self + 0xa00);
+		vt = (void (**)(void))p;
+		vt[31]();
+		if (self->blendModel.frameController.finished()) {
+			func_ov013_0213775c(self, data_ov013_0213b8b8, 1);
+		}
 	}
 	return true;
 }
