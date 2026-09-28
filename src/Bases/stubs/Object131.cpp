@@ -73,6 +73,9 @@ struct Slot5 {
 };
 
 extern Tri3 data_ov013_0213b498;
+extern u8 data_ov013_0213b3b4[];
+extern u8 data_ov013_0213b3e4[];
+extern u32 data_ov013_0213b8b8[2];
 extern Quad data_ov013_0213b54c;
 extern Quad data_ov013_0213b55c;
 extern Slot5 data_ov013_0213b63c;
@@ -209,6 +212,8 @@ void func_ov013_02130414(Object131 *);
 bool func_ov013_02136f50(Object131 *, s32);
 bool func_ov013_02137114(Object131 *, s32);
 void func_ov013_02135e0c(Object131 *);
+void func_ov013_02130414(Object131 *);
+bool func_ov013_02133f00(Object131 *);
 }
 
 // 0x0212fae0
@@ -1339,6 +1344,46 @@ extern "C" void func_ov013_02135e0c(Object131 *self)
 		*(s32 *)((u8 *)self + 0xd8) = 0;
 		func_ov013_02130414(self);
 	}
+}
+
+// 0x02130414
+extern "C" void func_ov013_02130414(Object131 *self)
+{
+	Tri v;
+	Tri t;
+
+	v = *(Tri *)data_ov013_0213b3b4;
+	t = *(Tri *)data_ov013_0213b3e4;
+	self->blendModel.pushAnimation(v.v[self->sub._68], 0xa, 0, -t.v[self->sub._68],
+		self->blendModel.frameController.getFrameCount() - 1);
+}
+
+// 0x02133f00
+extern "C" bool func_ov013_02133f00(Object131 *self)
+{
+	void (**vt)(void);
+	void *p;
+
+	if (self->sub._60 == 0) {
+		self->blendModel.pushAnimation(0xd, 2, 0x40000000, 0x800, 0);
+		*(s32 *)((u8 *)self + 0xd0) = 0;
+		*(s32 *)((u8 *)self + 0xd4) = 0;
+		*(s32 *)((u8 *)self + 0xd8) = 0;
+		self->sub._d1 = 0;
+		self->sub._b5 = 1;
+		self->sub._60++;
+		return true;
+	}
+	if (self->sub._60 == -1) {
+		return true;
+	}
+	p = *(void **)((u8 *)self + 0xa00);
+	vt = (void (**)(void))p;
+	vt[31]();
+	if (self->blendModel.frameController.finished()) {
+		func_ov013_0213775c(self, data_ov013_0213b8b8[0], data_ov013_0213b8b8[1], 1);
+	}
+	return true;
 }
 
 void *Object132::create()
