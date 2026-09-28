@@ -1180,13 +1180,13 @@ extern "C" bool func_ov013_02133fc4(Object131 *self)
 // 0x021372c0
 extern "C" void func_ov013_021372c0(Object131 *self)
 {
-	Vec3_32 v;
-
 	func_020205ec(self);
 	func_ov010_020f982c(3, self->_2be);
+	Vec3_32 v;
+	s32 pz = self->position.z;
 	v.y = func_0200aca0(0);
 	v.x = func_0200acc4(0);
-	v.z = self->position.z;
+	v.z = pz;
 	func_02012398(0xd7, &v);
 }
 
@@ -1272,13 +1272,13 @@ void *Object131::create()
 // 0x02137328
 extern "C" void func_ov013_02137328(Object131 *self, s32 a, s32 b)
 {
-	Vec3_32 v;
-
 	func_020205ec(self);
 	func_ov010_020f982c(a, self->_2be);
+	Vec3_32 v;
+	s32 pz = self->position.z;
 	v.y = func_0200aca0(0);
 	v.x = func_0200acc4(0);
-	v.z = self->position.z;
+	v.z = pz;
 	func_02012398(b, &v);
 }
 
