@@ -36,6 +36,12 @@ extern u8 data_ov000_020ca298;
 extern u8 data_ov013_0213b620[];
 extern u8 data_ov013_0213b880[];
 extern u8 data_ov013_0213b424[];
+extern u32 data_ov013_0213b44c[];
+extern u32 data_ov013_0213b454[];
+extern u32 data_ov013_0213b464[];
+extern u32 data_ov013_0213b45c[];
+extern u32 data_ov013_0213ba10[2];
+extern u32 data_ov013_0213b9f0[2];
 extern u32 data_ov013_0213baa8[];
 extern u8 data_ov000_020ca880;
 extern u8 data_ov000_020ca898;
@@ -58,10 +64,15 @@ struct Tri {
 	u16 v[3];
 };
 
+struct Tri3 {
+	u32 v[3];
+};
+
 struct Slot5 {
 	u32 v[5];
 };
 
+extern Tri3 data_ov013_0213b498;
 extern Quad data_ov013_0213b54c;
 extern Quad data_ov013_0213b55c;
 extern Slot5 data_ov013_0213b63c;
@@ -192,6 +203,12 @@ void func_ov013_0213a05c();
 bool func_ov013_021376d8(Object131 *);
 void func_ov013_02137328(Object131 *, s32, s32);
 void func_ov013_0213775c(Object131 *, s32, s32, s32);
+s32 func_ov013_02136d9c(Object131 *);
+void func_ov013_021375e8(Object131 *, s32);
+void func_ov013_02130414(Object131 *);
+bool func_ov013_02136f50(Object131 *, s32);
+bool func_ov013_02137114(Object131 *, s32);
+void func_ov013_02135e0c(Object131 *);
 }
 
 // 0x0212fae0
@@ -1167,8 +1184,8 @@ extern "C" void func_ov013_021372c0(Object131 *self)
 
 	func_020205ec(self);
 	func_ov010_020f982c(3, self->_2be);
-	v.x = func_0200acc4(0);
 	v.y = func_0200aca0(0);
+	v.x = func_0200acc4(0);
 	v.z = self->position.z;
 	func_02012398(0xd7, &v);
 }
@@ -1250,6 +1267,78 @@ extern "C" bool func_ov013_0213875c()
 void *Object131::create()
 {
 	return new Object131();
+}
+
+// 0x02137328
+extern "C" void func_ov013_02137328(Object131 *self, s32 a, s32 b)
+{
+	Vec3_32 v;
+
+	func_020205ec(self);
+	func_ov010_020f982c(a, self->_2be);
+	v.y = func_0200aca0(0);
+	v.x = func_0200acc4(0);
+	v.z = self->position.z;
+	func_02012398(b, &v);
+}
+
+// 0x02136f50
+extern "C" bool func_ov013_02136f50(Object131 *self, s32 i)
+{
+	u32 cur = *(u32 *)((u8 *)self + 0x488);
+
+	if (!(self->sub._e2 > 0) && cur == data_ov013_0213b44c[i]) {
+		func_ov013_021375e8(self, 1);
+		func_ov013_02137228(self);
+		return true;
+	}
+	if (!(self->sub._e4 > 0) && cur == data_ov013_0213b454[i]) {
+		func_ov013_021371d0(self);
+		if (func_ov013_02136d9c(self)) {
+			func_ov013_0213775c(self, data_ov013_0213ba10[0], data_ov013_0213ba10[1], 1);
+			return true;
+		}
+	}
+	return false;
+}
+
+// 0x02137114
+extern "C" bool func_ov013_02137114(Object131 *self, s32 i)
+{
+	u32 cur = *(u32 *)((u8 *)self + 0x488);
+
+	if (!(self->sub._e2 > 0) && cur == data_ov013_0213b464[i]) {
+		func_ov013_021375e8(self, 1);
+		func_ov013_02137228(self);
+		return true;
+	}
+	if (!(self->sub._e4 > 0) && cur == data_ov013_0213b45c[i]) {
+		func_ov013_021371d0(self);
+		if (func_ov013_02136d9c(self)) {
+			func_ov013_0213775c(self, data_ov013_0213b9f0[0], data_ov013_0213b9f0[1], 1);
+			return true;
+		}
+	}
+	return false;
+}
+
+// 0x02135e0c
+extern "C" void func_ov013_02135e0c(Object131 *self)
+{
+	self->sub._dc = 0;
+	self->sub._d1 = 1;
+	Tri3 t = data_ov013_0213b498;
+	if (func_ov013_02135000(self) == 0) {
+		*(s32 *)((u8 *)self + 0xd0) = -t.v[self->sub._68];
+		*(s32 *)((u8 *)self + 0xd4) = 0;
+		*(s32 *)((u8 *)self + 0xd8) = 0;
+		func_ov013_021304bc(self);
+	} else {
+		*(s32 *)((u8 *)self + 0xd0) = t.v[self->sub._68];
+		*(s32 *)((u8 *)self + 0xd4) = 0;
+		*(s32 *)((u8 *)self + 0xd8) = 0;
+		func_ov013_02130414(self);
+	}
 }
 
 void *Object132::create()
