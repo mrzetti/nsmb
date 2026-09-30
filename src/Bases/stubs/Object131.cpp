@@ -71,6 +71,7 @@ struct Slot5 {
 };
 
 extern Tri3 data_ov013_0213b498;
+extern Tri3 data_ov013_0213b540;
 extern u8 data_ov013_0213b3b4[];
 extern u8 data_ov013_0213b3e4[];
 extern Pair data_ov013_0213b858;
@@ -194,6 +195,10 @@ bool func_ov013_02137830(Object131 *);
 
 void func_ov010_020f98f4();
 bool func_ov013_02133fc4(Object131 *);
+void func_ov013_0213170c(Object131 *);
+void func_ov013_021315f8(Object131 *, s32);
+void func_ov000_020a46bc(ActiveCollider *);
+void func_ov013_021305ec(void *);
 void func_ov013_021372c0(Object131 *);
 void func_ov013_021374b8(Object131 *);
 void func_ov013_02137550(Object131 *, s32);
@@ -1272,6 +1277,77 @@ extern "C" bool func_ov013_0213875c()
 	FS::loadFileToOverlayEmb(0x4d6, 0);
 	FS::loadFileToOverlayEmb(0x4d7, 0);
 	return true;
+}
+
+// mwccarm lowers a call through a pointer-to-member FUNCTION FIELD with a fixed
+// intrinsic: the field address in r3, the adjustment word in r1, and the dispatch
+// `ands #1 / ldrne r2,[r0] / ldrne r1,[r3] / ldrne r1,[r2,r1] / ldreq r1,[r3] /
+// blx r1`. The 8 bytes of `Sub` at +0xa20 are that field. This wrapper only names it;
+// the class layout of Object131 is untouched.
+class PmfPair {
+public:
+	u8 _pad[0xa20];
+	void (Object131::*fn0)();
+	void (Object131::*fn1)();
+};
+
+// 0x021324c8
+s32 Object131::onCreate()
+{
+	Tri3 v;
+	PmfPair *h;
+	s32 i;
+
+	func_ov013_0213170c(this);
+	v = data_ov013_0213b540;
+	if (!prepareResourcesSafe(v.v[sub._68], Memory_gameHeap)) {
+		return 0;
+	}
+	func_ov013_021316dc(this);
+	scale.x = 0x1200;
+	scale.y = 0x1200;
+	scale.z = 0x1200;
+	func_ov013_02131694(this);
+	h = (PmfPair *)this;
+	(this->*h->fn0)();
+	func_ov000_020a46bc(&collider1);
+	(this->*h->fn1)();
+	func_ov000_020a46bc(&collider2);
+	velocity.x = 0;
+	velocity.y = 0;
+	velocity.z = 0;
+	accelV = -0x300;
+	minVelocity.x = 0x4000;
+	minVelocity.y = -0x8000;
+	minVelocity.z = 0;
+	sub._de = -1;
+	sub._d7 = 0;
+	sub._c4 = 0;
+	sub._pad5[1] = 3;
+	sub._c6 = 0;
+	sub._cc = 0;
+	sub._6a = 0;
+	sub._da = 0;
+	if (sub._68 == 2) {
+		sub._pad5[0] = 0x1e;
+	} else {
+		sub._pad5[0] = 9;
+	}
+	func_ov013_02131564(this);
+	i = ((s32 *)data_ov013_0213b424)[sub._69];
+	scale.x = i;
+	scale.y = i;
+	scale.z = i;
+	sub._b4 = 0;
+	sub._b5 = 0;
+	func_ov013_021315f8(this, 0);
+	func_ov013_02138898(0);
+	func_ov013_0213885c(0);
+	blendModel.setCommandCallback(func_ov013_021305ec, 0, 6, 2);
+	blendModel.drawable.userData = this;
+	collisionType = 1;
+	_pad8[1] = 1;
+	return 1;
 }
 
 Object131::~Object131()
