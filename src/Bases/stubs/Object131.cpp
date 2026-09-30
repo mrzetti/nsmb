@@ -1455,12 +1455,12 @@ extern "C" bool func_ov013_02136aac(Object131 *self)
 
 void *Object132::create()
 {
-	return new Object132();
+	return new Object131();
 }
 
 void *Object133::create()
 {
-	return new Object133();
+	return new Object131();
 }
 
 // 0x0213ba78
