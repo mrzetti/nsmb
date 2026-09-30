@@ -1274,6 +1274,10 @@ extern "C" bool func_ov013_0213875c()
 	return true;
 }
 
+Object131::~Object131()
+{
+}
+
 void *Object131::create()
 {
 	return new Object131();

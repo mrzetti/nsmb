@@ -106,7 +106,7 @@ public:
 
 	static void *create();
 	inline Object131() {};
-	inline ~Object131() {};
+	~Object131();
 
 	s32 onCreate();
 	s32 onDestroy();
