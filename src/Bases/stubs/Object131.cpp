@@ -52,6 +52,16 @@ struct Pair {
 	s32 a, b;
 };
 
+// An 8-byte copy of this union is a WIDE SCALAR move in mwccarm: both source words are
+// loaded before either is stored. The same two words as a plain aggregate come out
+// interleaved (ldr/str/ldr/str), which is not what the target has.
+union Pair8 {
+	struct _ {
+		s32 a, b;
+	} s;
+	u64 q;
+};
+
 struct Spawn {
 	s32 *p;
 	s32 a;
@@ -80,6 +90,51 @@ extern Pair data_ov013_0213ba10;
 extern Pair data_ov013_0213b9f0;
 extern Pair data_ov013_0213b8b8;
 extern Pair data_ov013_0213b9b8;
+extern Pair8 data_ov013_0213b700;
+extern Pair8 data_ov013_0213b710;
+extern Pair8 data_ov013_0213b718;
+extern Pair8 data_ov013_0213b728;
+extern Pair8 data_ov013_0213b738;
+extern Pair8 data_ov013_0213b740;
+extern Pair8 data_ov013_0213b750;
+extern Pair8 data_ov013_0213b778;
+extern Pair8 data_ov013_0213b798;
+extern Pair8 data_ov013_0213b7a0;
+extern Pair8 data_ov013_0213b7a8;
+extern Pair8 data_ov013_0213b7b0;
+extern Pair8 data_ov013_0213b7b8;
+extern Pair8 data_ov013_0213b7c0;
+extern Pair8 data_ov013_0213b7d0;
+extern Pair8 data_ov013_0213b7d8;
+extern Pair8 data_ov013_0213b7e0;
+extern Pair8 data_ov013_0213b800;
+extern Pair8 data_ov013_0213b818;
+extern Pair8 data_ov013_0213b820;
+extern Pair8 data_ov013_0213b828;
+extern Pair8 data_ov013_0213b840;
+extern Pair8 data_ov013_0213b888;
+extern Pair8 data_ov013_0213b8a8;
+extern Pair8 data_ov013_0213b8b0;
+extern Pair8 data_ov013_0213b8c8;
+extern Pair8 data_ov013_0213b8d8;
+extern Pair8 data_ov013_0213b908;
+extern Pair8 data_ov013_0213b928;
+extern Pair8 data_ov013_0213b958;
+extern Pair8 data_ov013_0213b980;
+extern Pair8 data_ov013_0213b988;
+extern Pair8 data_ov013_0213b990;
+extern Pair8 data_ov013_0213b9c0;
+extern Pair8 data_ov013_0213b9c8;
+extern Pair8 data_ov013_0213b9d0;
+extern Pair8 data_ov013_0213b9e8;
+extern Pair8 data_ov013_0213b9f8;
+extern Pair8 data_ov013_0213ba00;
+extern Pair8 data_ov013_0213ba08;
+extern Pair8 data_ov013_0213ba20;
+extern Pair8 data_ov013_0213ba48;
+extern Pair8 data_ov013_0213ba50;
+extern Pair8 data_ov013_0213ba58;
+extern Pair8 data_ov013_0213ba60;
 extern Quad data_ov013_0213b54c;
 extern Quad data_ov013_0213b55c;
 extern Slot5 data_ov013_0213b63c;
@@ -1531,6 +1586,101 @@ extern "C" bool func_ov013_02136aac(Object131 *self)
 		}
 	}
 	return true;
+}
+
+// 0x0213170c
+// The seven t0..t6 locals are what give this function its frame. A local is only given a
+// frame slot once its live range crosses a later statement, so they are assigned in
+// descending destination order and consumed after the direct copy that sits between the
+// loads and the stores - that is what produces the target's 0x38 window per case, the
+// load burst, and the 14 spill/reload pairs.
+extern "C" void func_ov013_0213170c(Object131 *self)
+{
+	if (self->object_id == 0x83) {
+		self->sub._68 = 0;
+		self->sub._69 = 0;
+		Pair8 t0, t1, t2, t3, t4, t5, t6;
+
+		*(Pair8 *)&self->_pad9e0[8] = data_ov013_0213b958;
+		*(Pair8 *)&self->_pad9e0[0x10] = data_ov013_0213b980;
+		*(Pair8 *)&self->_pad9e0[0x18] = data_ov013_0213b9c0;
+		t0 = data_ov013_0213b9c8;
+		self->sub._e8 = 0;
+		*(Pair8 *)&self->sub._0 = t0;
+		*(Pair8 *)&self->sub._8 = data_ov013_0213b9e8;
+		*(Pair8 *)&self->sub._10[0] = data_ov013_0213b9f8;
+		*(Pair8 *)&self->sub._10[1] = data_ov013_0213ba20;
+		t4 = data_ov013_0213b710;
+		t3 = data_ov013_0213b990;
+		t2 = data_ov013_0213b7d8;
+		t1 = data_ov013_0213b7e0;
+		*(Pair8 *)&self->sub._10[2] = data_ov013_0213ba48;
+		*(Pair8 *)&self->sub._10[3] = t1;
+		*(Pair8 *)&self->sub._10[4] = t2;
+		*(Pair8 *)&self->sub._10[5] = t3;
+		*(Pair8 *)&self->sub._10[6] = t4;
+		t6 = data_ov013_0213b7b0;
+		t5 = data_ov013_0213b7b8;
+		*(Pair8 *)&self->sub._10[7] = data_ov013_0213b7c0;
+		*(Pair8 *)&self->sub._10[8] = t5;
+		*(Pair8 *)&self->sub._10[9] = t6;
+	} else if (self->object_id == 0x84) {
+		self->sub._68 = 1;
+		self->sub._69 = 0;
+		Pair8 t0, t1, t2, t3, t4, t5, t6;
+
+		*(Pair8 *)&self->_pad9e0[8] = data_ov013_0213b7a8;
+		*(Pair8 *)&self->_pad9e0[0x10] = data_ov013_0213b7a0;
+		*(Pair8 *)&self->_pad9e0[0x18] = data_ov013_0213b928;
+		t0 = data_ov013_0213b798;
+		self->sub._e8 = 0;
+		*(Pair8 *)&self->sub._0 = t0;
+		*(Pair8 *)&self->sub._8 = data_ov013_0213b740;
+		*(Pair8 *)&self->sub._10[0] = data_ov013_0213b908;
+		*(Pair8 *)&self->sub._10[1] = data_ov013_0213b750;
+		t4 = data_ov013_0213b8b0;
+		t3 = data_ov013_0213ba60;
+		t2 = data_ov013_0213b828;
+		t1 = data_ov013_0213b8c8;
+		*(Pair8 *)&self->sub._10[2] = data_ov013_0213b778;
+		*(Pair8 *)&self->sub._10[3] = t1;
+		*(Pair8 *)&self->sub._10[4] = t2;
+		*(Pair8 *)&self->sub._10[5] = t3;
+		*(Pair8 *)&self->sub._10[6] = t4;
+		t6 = data_ov013_0213b888;
+		t5 = data_ov013_0213b800;
+		*(Pair8 *)&self->sub._10[7] = data_ov013_0213b8a8;
+		*(Pair8 *)&self->sub._10[8] = t5;
+		*(Pair8 *)&self->sub._10[9] = t6;
+	} else if (self->object_id == 0x85) {
+		self->sub._68 = 2;
+		self->sub._69 = 1;
+		Pair8 t0, t1, t2, t3, t4, t5, t6;
+
+		*(Pair8 *)&self->_pad9e0[8] = data_ov013_0213b818;
+		*(Pair8 *)&self->_pad9e0[0x10] = data_ov013_0213b820;
+		*(Pair8 *)&self->_pad9e0[0x18] = data_ov013_0213b840;
+		t0 = data_ov013_0213ba58;
+		self->sub._e8 = 1;
+		*(Pair8 *)&self->sub._0 = t0;
+		*(Pair8 *)&self->sub._8 = data_ov013_0213b8d8;
+		*(Pair8 *)&self->sub._10[0] = data_ov013_0213ba00;
+		*(Pair8 *)&self->sub._10[1] = data_ov013_0213b988;
+		t4 = data_ov013_0213b7d0;
+		t3 = data_ov013_0213b700;
+		t2 = data_ov013_0213ba50;
+		t1 = data_ov013_0213ba08;
+		*(Pair8 *)&self->sub._10[2] = data_ov013_0213b9d0;
+		*(Pair8 *)&self->sub._10[3] = t1;
+		*(Pair8 *)&self->sub._10[4] = t2;
+		*(Pair8 *)&self->sub._10[5] = t3;
+		*(Pair8 *)&self->sub._10[6] = t4;
+		t6 = data_ov013_0213b738;
+		t5 = data_ov013_0213b728;
+		*(Pair8 *)&self->sub._10[7] = data_ov013_0213b718;
+		*(Pair8 *)&self->sub._10[8] = t5;
+		*(Pair8 *)&self->sub._10[9] = t6;
+	}
 }
 
 void *Object132::create()
