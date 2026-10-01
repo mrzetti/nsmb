@@ -267,7 +267,7 @@ void *func_02022a04(s32);
 void func_ov013_0213a05c();
 bool func_ov013_021376d8(Object131 *);
 void func_ov013_02137328(Object131 *, s32, s32);
-void func_ov013_0213775c(Object131 *, Pair, s32);
+bool func_ov013_0213775c(Object131 *, Pair, s32);
 s32 func_ov013_02136d9c(Object131 *);
 void func_ov013_021375e8(Object131 *, s32);
 void func_ov013_02130414(Object131 *);
@@ -478,6 +478,39 @@ extern "C" bool func_ov013_021376d8(Object131 *self)
 	tab[1] = data_ov013_0213b3f4[1];
 	self->sub._64 = tab[self->sub._62];
 	func_ov013_0213775c(self, data_ov013_0213b880, 1);
+	return true;
+}
+
+// 0x0213775c
+// The Pair argument is the state pair stored at _pad9e0[0]: it is compared and assigned
+// through a real pmf type, which is what makes the compiler take the address of BOTH
+// operands (`add r1,this,#0x9e0` / `add r0,sp,#0x14`) and compare the words one at a time
+// instead of as a u64. Both dispatch sites reach the member as `add r3, this, #0x9e0`, a
+// single add off this, so it is addressed through a wrapper rather than a saved pointer,
+// and never through a pmf-typed local.
+typedef void (Object131::*PmfS32)(s32);
+
+class Object131Pmf {
+public:
+	u8 _pad[0x9e0];
+	PmfS32 fn;
+};
+
+// The early-outs fall into the one shared exit rather than repeating it, which is what
+// materialises the target's `mov r0,#1` on a single tail instead of inline epilogues.
+extern "C" bool func_ov013_0213775c(Object131 *self, Pair p, s32 arg)
+{
+	Object131Pmf *h = (Object131Pmf *)self;
+
+	if (h->fn != *(PmfS32 *)&p) {
+		if (h->fn != NULL) {
+			self->sub._60 = -1;
+			(self->*h->fn)(arg);
+		}
+		h->fn = *(PmfS32 *)&p;
+		self->sub._60 = 0;
+		(self->*h->fn)(arg);
+	}
 	return true;
 }
 
