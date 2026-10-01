@@ -63,12 +63,6 @@ union Pair8 {
 	u64 q;
 };
 
-struct Spawn {
-	s32 *p;
-	s32 a;
-	s32 b;
-};
-
 struct Tri {
 	u16 v[3];
 };
@@ -1241,36 +1235,33 @@ extern "C" void func_ov013_02132fa0(Object131 *self)
 // 0x021350d4
 extern "C" void func_ov013_021350d4(Object131 *self, s32 *a)
 {
-	Spawn s;
+	s32 v;
 
 	a[1] += 0xc000;
 	a[2] += 0xa000;
-	s.p = &s.b;
-	s.a = 0;
-	s.b = 0x1400;
-	Actor::spawnActor(0x4e, (0xffff0 & (((s16 *)data_ov013_0213b48c)[self->sub._ea] << 4)) | 3 | (self->sub._68 << 28), 0, 0, (s32 *)&s, 0);
+	s8 id = self->sub._68;
+	v = 0x1400;
+	Actor::spawnActor(0x4e, (0xffff0 & (((s16 *)data_ov013_0213b48c)[self->sub._ea] << 4)) | 3 | (id << 28), 0, 0, &v, 0);
 }
 
 // 0x021351c8
 extern "C" void func_ov013_021351c8(Object131 *self, Vec3_32 *a)
 {
-	Spawn s;
+	s8 id = self->sub._68;
+	s32 v;
 
-	s.p = &s.b;
-	s.a = 0;
-	s.b = 0x1400;
-	Actor::spawnActor(0x4e, 0x1001 | (self->sub._68 << 28), a, 0, (s32 *)&s, 0);
+	v = 0x1400;
+	Actor::spawnActor(0x4e, 0x1001 | (id << 28), a, 0, &v, 0);
 }
 
 // 0x02135210
 extern "C" void func_ov013_02135210(Object131 *self, Vec3_32 *a)
 {
-	Spawn s;
+	s8 id = self->sub._68;
+	s32 v;
 
-	s.p = &s.b;
-	s.a = 0;
-	s.b = 0x1000;
-	Actor::spawnActor(0x4e, self->sub._68 << 28, a, 0, (s32 *)&s, 0);
+	v = 0x1000;
+	Actor::spawnActor(0x4e, id << 28, a, 0, &v, 0);
 }
 
 // 0x021352cc
