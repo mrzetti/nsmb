@@ -2,6 +2,7 @@
 
 extern s8 data_ov013_0213be60;
 extern s8 data_ov013_0213be64;
+extern s16 data_ov013_0213b354[];
 extern s16 data_ov013_0213b358[];
 extern u8 data_ov013_0213b5cc[];
 extern u8 data_ov013_0213b604[];
@@ -86,6 +87,8 @@ extern u8 data_ov013_0213b3b4[];
 extern u8 data_ov013_0213b3e4[];
 extern Pair data_ov013_0213b858;
 extern Pair data_ov013_0213b880;
+extern Pair data_ov013_0213b8f8;
+extern Pair data_ov013_0213b900;
 extern Pair data_ov013_0213ba10;
 extern Pair data_ov013_0213b9f0;
 extern Pair data_ov013_0213b8b8;
@@ -279,6 +282,8 @@ bool func_ov013_02133f00(Object131 *);
 void func_ov013_02137914(Object131 *, PlayerBase *);
 void func_ov013_02130e58(Object131 *);
 bool func_ov013_02136aac(Object131 *);
+bool func_ov013_02134dd4(Object131 *);
+s32 func_ov000_020a917c(CollisionManager *);
 }
 
 // 0x0212fae0
@@ -440,6 +445,65 @@ extern "C" void func_ov013_02131d7c(Object131 *self)
 	self->sub._e2--;
 	self->sub._e4--;
 	self->sub._e6--;
+}
+
+// Same fixed dispatch intrinsic as PmfPair in onCreate (see the comment there): the field
+// address in r3, the adjustment word in r1, `ands #1 / ldrne x3 / ldrne x3 / ldreq x3 / blx`.
+// This function needs the third of the 8-byte function fields as well, at Sub+0x30 (0xa30),
+// so it gets its own wrapper rather than extending PmfPair. Object131's layout is untouched.
+class PmfTriple {
+public:
+	u8 _pad[0xa20];
+	void (Object131::*fn0)();
+	void (Object131::*fn1)();
+	void (Object131::*fn2)();
+};
+
+// 0x02134dd4
+// Every exit funnels into the one `return true`, which is what collapses four separate
+// epilogues in the source into the target's single `mov r0,#1` tail.
+extern "C" bool func_ov013_02134dd4(Object131 *self)
+{
+	PmfTriple *h = (PmfTriple *)self;
+
+	if (self->sub._60 == 0) {
+		*(s32 *)((u8 *)self + 0xd0) = 0;
+		self->sub._d1 = 1;
+		func_ov013_02130540(self);
+		self->direction = 1;
+		self->sub._60++;
+	} else if (self->sub._60 != -1) {
+		self->blendModel.update();
+		self->updateVerticalVelocity();
+		self->func_ov000_0209c85c();
+		if (func_ov000_020a917c(&self->collisionMgr)) {
+			*(s32 *)((u8 *)self + 0xd4) = 0;
+		}
+		(self->*h->fn2)();
+		func_ov000_020a46bc(&self->collider1);
+		self->rotation.y += data_ov013_0213b354[self->direction];
+		func_ov013_02130f08(self);
+		if (self->rotation.y >= data_ov013_0213b358[0]) {
+			self->rotation.y = data_ov013_0213b358[0];
+			(self->*h->fn0)();
+			func_ov000_020a46bc(&self->collider1);
+			(self->*h->fn1)();
+			func_ov000_020a46bc(&self->collider2);
+			func_ov013_0213775c(self, data_ov013_0213b900, 1);
+		} else {
+			if (self->rotation.y <= data_ov013_0213b358[1]) {
+				self->rotation.y = data_ov013_0213b358[1];
+				(self->*h->fn0)();
+				func_ov000_020a46bc(&self->collider1);
+				(self->*h->fn1)();
+				func_ov000_020a46bc(&self->collider2);
+				self->sub._62 = 0;
+				self->sub._64 = 0;
+				func_ov013_0213775c(self, data_ov013_0213b8f8, 1);
+			}
+		}
+	}
+	return true;
 }
 
 // 0x02135080
