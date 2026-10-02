@@ -1324,9 +1324,6 @@ extern "C" bool func_ov013_021387f4()
 // 0x02133fc4
 extern "C" bool func_ov013_02133fc4(Object131 *self)
 {
-	void (**vt)(void);
-	void *p;
-
 	if (self->sub._60 == 0) {
 		func_ov013_0212ffac(self);
 		self->velocity.x = 0;
@@ -1335,16 +1332,11 @@ extern "C" bool func_ov013_02133fc4(Object131 *self)
 		self->sub._d1 = 0;
 		self->sub._b5 = 1;
 		self->sub._60++;
-		return true;
-	}
-	if (self->sub._60 == -1) {
-		return true;
-	}
-	p = *(void **)&self->sub._7c;
-	vt = (void (**)(void))p;
-	vt[31]();
-	if (self->blendModel.frameController.finished()) {
-		func_ov013_02137550(self, 1);
+	} else if (self->sub._60 != -1) {
+		self->_11();
+		if (self->blendModel.frameController.finished()) {
+			func_ov013_02137550(self, 1);
+		}
 	}
 	return true;
 }
@@ -1511,6 +1503,20 @@ Object131::~Object131()
 {
 }
 
+bool Object131::_01()
+{
+	return false;
+}
+
+void Object131::_11()
+{
+	blendModel.update();
+}
+
+void Object131::pendingDestroy()
+{
+}
+
 void *Object131::create()
 {
 	return new Object131();
@@ -1670,9 +1676,6 @@ extern "C" void func_ov013_02130414(Object131 *self)
 // 0x02133f00
 extern "C" bool func_ov013_02133f00(Object131 *self)
 {
-	void (**vt)(void);
-	void *p;
-
 	if (self->sub._60 == 0) {
 		self->blendModel.pushAnimation(0xd, 2, 0x40000000, 0x800, 0);
 		*(s32 *)((u8 *)self + 0xd0) = 0;
@@ -1682,9 +1685,7 @@ extern "C" bool func_ov013_02133f00(Object131 *self)
 		self->sub._b5 = 1;
 		self->sub._60++;
 	} else if (self->sub._60 != -1) {
-		p = *(void **)((u8 *)self + 0xa00);
-		vt = (void (**)(void))p;
-		vt[31]();
+		self->_11();
 		if (self->blendModel.frameController.finished()) {
 			func_ov013_0213775c(self, data_ov013_0213b8b8, 1);
 		}
