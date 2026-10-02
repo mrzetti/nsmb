@@ -81,6 +81,9 @@ extern u8 data_ov013_0213b3b4[];
 extern u8 data_ov013_0213b3e4[];
 extern Pair data_ov013_0213b858;
 extern Pair data_ov013_0213b880;
+extern Pair data_ov013_0213b960;
+extern Pair data_ov013_0213b968;
+extern Pair data_ov013_0213b970;
 extern Pair data_ov013_0213b8f8;
 extern Pair data_ov013_0213b900;
 extern Pair data_ov013_0213ba10;
@@ -278,6 +281,13 @@ void func_ov013_02130e58(Object131 *);
 bool func_ov013_02136aac(Object131 *);
 bool func_ov013_02134dd4(Object131 *);
 s32 func_ov000_020a917c(CollisionManager *);
+// The target calls this one as a BARE symbol, so it is not a member of CollisionMgr in
+// the original: it takes the manager as a plain first argument. Declaring it as a free
+// C-linkage function here is what makes the call site emit `bl func_01ffe778`.
+bool func_01ffe778(CollisionManager *, i32 *, u32);
+bool func_ov013_02135eb4(Object131 *);
+void func_ov013_02130f68(Object131 *);
+s32 func_ov013_02135dd8(Object131 *);
 }
 
 // 0x0212fae0
@@ -1557,6 +1567,73 @@ extern "C" bool func_ov013_02137114(Object131 *self, s32 i)
 		}
 	}
 	return false;
+}
+
+// Same pmf intrinsic as PmfPair / PmfTriple, over the four function fields at +0x9f0,
+// +0x9f8, +0xa08 and +0xa48. The wrapper has to start at the LOWEST of them, so it
+// swallows Sub+0x00..Sub+0x4c; Object131's own layout is untouched.
+class PmfQuad {
+public:
+	u8 _pad[0x9f0];
+	void (Object131::*f0)();
+	bool (Object131::*f1)(s32);
+	u8 _pad1[8];
+	bool (Object131::*f2)();
+	u8 _pad2[0x38];
+	void (Object131::*f3)();
+};
+
+// 0x02135eb4
+extern "C" bool func_ov013_02135eb4(Object131 *self)
+{
+	PmfQuad *q = (PmfQuad *)self;
+
+	if (self->sub._60 == 0) {
+		func_ov013_02135e0c(self);
+		self->sub._60++;
+	} else if (self->sub._60 != -1) {
+		// NOT onUpdate_8(): this mwccarm places a virtual's call offset 8 bytes below the
+		// slot it occupies in _ZTV9Object131, so the target's `ldr r1,[r1,#0x7c]` - the slot
+		// _ZTV9Object131 gives to onUpdate_8 - is what `_11()` compiles to here. _11 also
+		// returns void, which is why the target discards the result.
+		self->_11();
+		if ((self->*q->f2)()) {
+			return true;
+		}
+		(self->*q->f0)();
+		if ((self->*q->f1)(1)) {
+			return true;
+		}
+		self->updateVerticalVelocity();
+		self->func_ov000_0209c85c();
+		if (func_ov000_020a917c(&self->collisionMgr)) {
+			*(s32 *)((u8 *)self + 0xd4) = 0;
+		}
+		if (func_01ffe778(&self->collisionMgr, 0, 0)) {
+			*(s32 *)((u8 *)self + 0xd0) = 0;
+		}
+		(self->*q->f3)();
+		if (self->sub._dc > 0) {
+			if (func_ov013_02135080(self)) {
+				func_ov013_0213775c(self, data_ov013_0213b970, 1);
+				return true;
+			}
+		} else if (self->direction != self->func_ov000_0209acd4(&self->position)) {
+			self->sub._dc = 10;
+		}
+		func_ov013_02130f68(self);
+		s32 n = func_ov013_02135dd8(self);
+
+		if (n == 1) {
+			func_ov013_0213775c(self, data_ov013_0213b968, 1);
+		} else if (n == 2) {
+			self->sub._d4 = -1;
+			self->sub._62 = 0;
+			func_ov013_021371c0(self);
+			func_ov013_0213775c(self, data_ov013_0213b960, 1);
+		}
+	}
+	return true;
 }
 
 // 0x02135e0c
