@@ -1240,8 +1240,12 @@ extern "C" void func_ov013_021350d4(Object131 *self, s32 *a)
 	a[1] += 0xc000;
 	a[2] += 0xa000;
 	s8 id = self->sub._68;
+	s32 flags = 0xffff0 & (((s16 *)data_ov013_0213b48c)[self->sub._ea] << 4);
+
+	flags |= 3;
+	flags |= id << 28;
 	v = 0x1400;
-	Actor::spawnActor(0x4e, (0xffff0 & (((s16 *)data_ov013_0213b48c)[self->sub._ea] << 4)) | 3 | (id << 28), 0, 0, &v, 0);
+	Actor::spawnActor(0x4e, flags, (Vec3_32 *)a, 0, &v, 0);
 }
 
 // 0x021351c8
